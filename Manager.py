@@ -24,7 +24,7 @@ class Manager:
                     data=json.loads(jsonData)
                     action=data["action"]
 
-                    if action=="1":#create auction
+                    if action=="1": #create auction
                         validation_func = data["auction"]["validation"]
                         manipulation_func = data["auction"]["manipulation"]
                         if (validation_func=="" or syntaticValidation(validation_func)) and (manipulation_func=="" or syntaticValidation(manipulation_func)):
@@ -32,8 +32,9 @@ class Manager:
                         else:
                             return '{"status":1}'
 
-                    elif action=="2":#end auction
-                        del self.auctions[data["auction"]["serialNum"]]
+                    elif action=="2": #end auction
+                        if data["auction"]["serialNum"] in self.auctions:
+                            del self.auctions[data["auction"]["serialNum"]]
                         
                     if action=="10":
                         bid=data["bid"]
@@ -109,21 +110,22 @@ def encryptMsg(response, public_key):
     return out
 
 def syntaticValidation(code):
+    print("now validating code...")
     # Forbidden words:
     if "import" in code or "sys" in code or "path" in code or "dir" in code:
         return False
     # Function definition in the beggining of the string (with only 1 'def'!) 
     i = code.find("def")
-    if i == None:
+    if i == -1:
         return False
     else:
         if i != 0:
             return False
         i2 = code.find("def", i+1)
-        if i2 != None:
+        if i2 != -1:
             return False
     # Function name and its only argument:
     a = code.find("validate(bid)")
-    if a == None:
+    if a == -1:
         return False
     return True

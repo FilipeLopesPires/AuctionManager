@@ -128,7 +128,7 @@ async def interface():
                                         #exec(validation_func, {'bid':bid_obj})
                                     message["auction"]["validation"]=validation_func
                                     
-                                    print("Manipulation function (write a function called 'manipulate' accepting only one argument 'bid' with Python3 syntax, write 'end' to finish or skip this step):")
+                                    print("Manipulation functions (write a function called 'manipulate' accepting only one argument 'bid' with Python3 syntax, write 'end' to finish or skip this step):")
                                     manipulation_func = ""
                                     input_str = input()
                                     while input_str != "end":
@@ -152,7 +152,7 @@ async def interface():
                                 response = await websocket1.recv()
                                 symmetric_key, symmetric_iv, data = decryptMsg(response, client_private_key)
                                 print(data)
-                                
+
                             act = input("0-Leave\n1-Create Auction\n2-Close Auction\n3-List Auctions\n4-List Bids of Auction\n5-List Bids by Client\n6-Check Outcome\n7-Make Bid\nAction: ")
 
 asyncio.get_event_loop().run_until_complete(interface())
