@@ -113,7 +113,18 @@ async def interface():
                                        usersBids="-1"
                                     message["auction"]["limitusers"]=int(limitUsers)
                                     message["auction"]["userbids"]=int(usersBids)
-                                    message["auction"]["validation"]=input("Validation file: ")
+                                    print("Validation function (write a function called 'validate' with Python3 syntax, write 'end' to finish or skip):")
+                                    validation_func = "" #'''\n"
+                                    input_str = input()
+                                    while input_str != "end":
+                                        validation_func += input_str + "\n"
+                                        input_str = input()
+                                    if validation_func != "":
+                                        validation_func += "\nvalidate(bid)\n"#'''"
+                                        #print(validation_func)
+                                        #exec(validation_func, {'bid':bid_obj})
+                                    message["auction"]["validation"]=validation_func
+                                    
                                 if act=="2":
                                     message["auction"]={"serialNum":input("*Serial Number: ")}
 
