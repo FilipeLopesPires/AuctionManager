@@ -7,7 +7,8 @@ repo = Repository()
 async def sioRepository(websocket, path):
     while True:
         request = await websocket.recv()
-        await websocket.send(await repo.process(request))
+        print(request)
+        #await websocket.send(await repo.process(request))
 
 start_server = websockets.serve(sioRepository, 'localhost', 7654)
 
