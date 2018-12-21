@@ -62,13 +62,13 @@ def encryptMsg(response, public_key):
 
 
 async def sioRepository(websocket, path):
-    with open("server_private_key.pem", "rb") as server_private_key_file:
-        server_private_key = serialization.load_pem_private_key(server_private_key_file.read(), password=b"SIO_85048_85122", backend=default_backend())
+    with open("repository_private_key.pem", "rb") as repository_private_key_file:
+        repository_private_key = serialization.load_pem_private_key(repository_private_key_file.read(), password=b"SIO_85048_85122", backend=default_backend())
 
         while True:
             request = await websocket.recv()
             
-            symmetric_key, symmetric_iv, client_public_key_str, data = decryptMsg(request, server_private_key)
+            symmetric_key, symmetric_iv, client_public_key_str, data = decryptMsg(request, repository_private_key)
 
             response = await repo.process(data)
 

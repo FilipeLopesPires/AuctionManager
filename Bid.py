@@ -7,12 +7,11 @@ class Bid:
         self.amount=data["amount"]
         self.auction=data["auction"]
 
-
     def getUser(self):
-        return self.user
+        return '{"user":'+self.user+'}'
 
     def getAmount(self):
-        return self.amount
+        return '{"amount":'+self.amount+'}'
 
     def getRepr(self):
         return {"auction":self.auction, "user":self.user, "amount":self.amount, "time":self.time}

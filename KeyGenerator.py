@@ -43,8 +43,9 @@ def SymmetricKeyGenerator():
 
 
 password = b"SIO_85048_85122"
-destination = "server"
+#destination = "manager"
+destination = "repository"
 #destination = "client"
 
-#RSAKeyGenerator(password,destination)
-SymmetricKeyGenerator()
+RSAKeyGenerator(password,destination)
+#SymmetricKeyGenerator()
