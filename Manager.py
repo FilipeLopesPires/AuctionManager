@@ -25,7 +25,12 @@ class Manager:
                     action=data["action"]
 
                     if action=="1":#create auction
-                        self.auctions[data["auction"]["serialNum"]]={"limitUsers":data["auction"]["limitusers"],"userBids":data["auction"]["userbids"],"validation":data["auction"]["validation"], "users":{}}
+                        validation_func = data["auction"]["validation"]
+                        manipulation_func = data["auction"]["manipulation"]
+                        if (validation_func=="" or syntaticValidation(validation_func)) and (manipulation_func=="" or syntaticValidation(manipulation_func)):
+                            self.auctions[data["auction"]["serialNum"]]={"limitUsers":data["auction"]["limitusers"],"userBids":data["auction"]["userbids"],"validation":validation_func,"manipulation":manipulation_func, "users":{}}
+                        else:
+                            return '{"status":1}'
 
                     elif action=="2":#end auction
                         del self.auctions[data["auction"]["serialNum"]]
@@ -102,3 +107,23 @@ def encryptMsg(response, public_key):
     out= key_cyphered+ b"PROJ_SIO_2018"+ iv_cyphered+ b"PROJ_SIO_2018"+ ct
 
     return out
+
+def syntaticValidation(code):
+    # Forbidden words:
+    if "import" in code or "sys" in code or "path" in code or "dir" in code:
+        return False
+    # Function definition in the beggining of the string (with only 1 'def'!) 
+    i = code.find("def")
+    if i == None:
+        return False
+    else:
+        if i != 0:
+            return False
+        i2 = code.find("def", i+1)
+        if i2 != None:
+            return False
+    # Function name and its only argument:
+    a = code.find("validate(bid)")
+    if a == None:
+        return False
+    return True
