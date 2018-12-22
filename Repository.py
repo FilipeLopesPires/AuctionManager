@@ -3,6 +3,7 @@ import json
 import base64
 import asyncio
 import websockets
+
 from EnglishAuction import EnglishAuction
 from ReversedAuction import ReversedAuction
 from BlindAuction import BlindAuction
@@ -16,6 +17,7 @@ from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 class Repository:
 
     def __init__(self):
+        self.users={}
         self.auctions={}
         self.closed={}
         self.puzzles={}
@@ -24,13 +26,12 @@ class Repository:
     async def process(self, jsonData, client_public_key):
         data=json.loads(jsonData)
         action=data["action"]
+        
         if action=="1":#create auction          ---------receber action e auction->completa
             if data["auction"] != None:
                 auct=data["auction"]
-
                 if auct["serialNum"] in self.auctions.keys() or auct["serialNum"] in self.closed.keys():
                     return '{"status":1}'
-
                 if auct["type"]=="1":
                 	a = EnglishAuction(auct["name"], auct["descr"], auct["time"], auct["serialNum"], self, auct["minv"])
                 if auct["type"]=="2":
@@ -38,6 +39,7 @@ class Repository:
                 if auct["type"]=="3":
                 	a = BlindAuction(auct["name"], auct["descr"], auct["time"], auct["serialNum"], self, auct["minv"])
                 self.auctions[auct["serialNum"]]=a
+        
         elif action=="2":#end auction         ---------receber action e auction->serialNum
             if data["auction"] != None:
                 auct=data["auction"]
@@ -45,31 +47,63 @@ class Repository:
                     self.auctions[auct["serialNum"]].endAuction()
                     self.closed[auct["serialNum"]]=self.auctions[auct["serialNum"]]
                     del self.auctions[auct["serialNum"]]
+        
         elif action=="3":#list auctions          ---------receber action
             return json.dumps({"opened":[self.auctions[x].getRepr() for x in self.auctions.keys()], "closed":[self.closed[x].getRepr() for x in self.closed.keys()]})
+        
         elif action=="4":#list bids of auction         ---------receber action e auction->serialNum
             auct=data["auction"]
             if auct["serialNum"] not in self.closed:
                 return '{"status":1}'
             auctKey, auctIv = self.closed[auct["serialNum"]].getKeyIv()
             return json.dumps({"key": auctKey , "iv": auctIv , "chain": self.closed[auct["serialNum"]].getBids()})
+        
         elif action=="5":#list bids by user --------receber action e user
             user=data["user"]
+
+            if user in self.users.keys():
+                if self.users[user]!=client_public_key.public_numbers():
+                    return '{"status":1}'
+            else:
+                self.users[user] = client_public_key.public_numbers()
+
             liveBids=[self.auctions[x].getBids() for x in self.auctions.keys()]
             deadBids=[self.closed[x].getBids() for x in self.closed.keys()]
             return json.dumps({"bids":[y.getRepr() for x in liveBids for y in x if y.getUser()==user] + [y.getRepr() for x in deadBids for y in x if y.getUser()==user]})
+        
         elif action=="6":#get Auction outcome          ---------receber action e auction->serialNum
             auct=data["auction"]
             return self.auctions[auct["serialNum"]].getWinningBid().getUser()
+        
         elif action=="7":#make Bid          ---------receber action e bid
             if "bid" in data.keys():
                 bid=data["bid"]
+                user=bid["user"]
+
+                if user in self.users.keys():
+                    if self.users[user]!=client_public_key.public_numbers():
+                        return '{"status":1}'
+                else:
+                    self.users[user] = client_public_key.public_numbers()
+
                 if "cryptoanswer" in bid.keys() and self.validateCryptoPuzzle(client_public_key, bid, bid["cryptoanswer"]):
-                    if bid["auction"] in self.auctions:
-                        return await self.auctions[bid["auction"]].makeBid(data["bid"])
-                    return '{"status":1}'
+                    return await self.auctions[bid["auction"]].makeBid(data["bid"])
                 return '{"status":1}'
-            return json.dumps({"cryptopuzzle":self.createCryptoPuzzle(client_public_key)})
+            
+            if data["auction"] in self.auctions:
+                auction = self.auctions[data["auction"]]
+                puzzle_msg = {"cryptopuzzle":self.createCryptoPuzzle(client_public_key)}
+                if isinstance(auction,EnglishAuction):
+                    puzzle_msg["current_value"] = auction.highestBidValue
+                elif isinstance(auction,ReversedAuction):
+                    puzzle_msg["current_value"] = auction.lowestBidValue
+                    puzzle_msg["margin_value"] = auction.marginValue
+                    puzzle_msg["minimum_value"] = auction.minimumValue
+                elif isinstance(auction,BlindAuction):
+                    puzzle_msg["minimum_value"] = auction.minimumValue
+                return json.dumps(puzzle_msg)
+            return '{"status":1}'
+            
         return '{"status":0}'
 
 
@@ -115,6 +149,11 @@ class Repository:
         if puzzle==checksum:
             return True
         return False
+
+    def getPrivKey(self):
+        with open("repository_private_key.pem", "rb") as repository_private_key_file:
+            repository_private_key = serialization.load_pem_private_key(repository_private_key_file.read(), password=b"SIO_85048_85122", backend=default_backend())
+            return repository_private_key
 
 
 def decryptMsg(request, private_key):

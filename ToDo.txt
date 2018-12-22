@@ -1,13 +1,5 @@
-Blockchain - all auction types
-Blockchain integrity control - sending blockchain, iv and key to client
-Bid Receipts - sending current blockchain state
-Crypto Puzzle
+User Interface - show current auction value
+Sealing Blockchain
+User Privacy
 Validation/Modification Functions - application (actually calling them, threads??)
-
-
-Crypto Puzzle
-
--qd recebo um bid, criar random num, enviar ao client
--client calcula checksums, envia resultado qd passa nas condicoes do puzzle
--
-
+SmartCard Usage

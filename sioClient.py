@@ -76,17 +76,22 @@ async def interface():
                             client_public_key = serialization.load_pem_public_key(client_public_key_file.read(), backend=default_backend())
                             client_private_key = serialization.load_pem_private_key(client_private_key_file.read(), password=b"SIO_85048_85122", backend=default_backend())
 
+                            print("\nWelcome to 'Blockchain-Based Auction Manager'!\nThis program was developed by Filipe Pires (85122) and Joao Alegria (85048) for the discipline SIO 2018/19.\n")
+                            user = input("Type in your username: ")
+
                             # User Interface Menu
-                            act = input("0-Leave\n1-Create Auction\n2-Close Auction\n3-List Auctions\n4-List Bids of Auction\n5-List Bids by Client\n6-Check Outcome\n7-Make Bid\nAction: ")
+                            act = input("0-Leave\n1-Create Auction\n2-Close Auction\n3-List Auctions\n4-List Bids of Auction\n5-List My Bids\n6-Check Outcome\n7-Make Bid\nAction: ")
                             while act!="0":
                                 if act!="1" and act!="2":
                                     message={"action":act}
                                     if act=="4" or act=="6":
                                         message["auction"]={"serialNum":input("Serial Number: ")}
                                     if act=="5":
-                                        message["user"]=input("User: ")
+                                        message["user"]=user
                                     if act=="7":
-                                        # Send encrypted message
+                                        # Send encrypted message (specifying the target auction)
+                                        auction = input("Auction: ")
+                                        message["auction"] = auction
                                         message["key"]=client_public_key.public_bytes(serialization.Encoding.PEM, serialization.PublicFormat.SubjectPublicKeyInfo).decode("utf-8")
                                         out = encryptMsg(json.dumps(message), repository_public_key)
                                         await websocket2.send(out)
@@ -94,9 +99,17 @@ async def interface():
                                         response = await websocket2.recv()
                                         symmetric_key, symmetric_iv, data = decryptMsg(response, client_private_key)
                                         data = json.loads(data)
+                                        # Fill in bid form
+                                        if "current_value" in data.keys():
+                                            if "margin_value" in data.keys():
+                                                print("This is an auction of Reversed type with a margin value of: " + str(data["margin_value"]) + " and a minimum value of: " + str(data["minimum_value"]) + ".\nThe auction winning bid is currently at value: " + str(data["current_value"]))
+                                            else:
+                                                print("This is an auction of English type.\n The auction winning bid is currently at value: " + str(data["current_value"]))
+                                        else:
+                                            print("This is an auction of Blind type with a minimum value of: " + str(data["minimum_value"]) + ".")
+                                        message["bid"]={"auction": auction,"user": user,"amount":float(input("Amount: ")), "time":str(datetime.now())}
                                         # Solve Crypto Puzzle
-                                        message["bid"]={"auction": input("Auction: "),"user": input("User: "),"amount":float(input("Amount: ")), "time":str(datetime.now())}
-                                        puzzle = base64.b64decode(data['cryptopuzzle'])
+                                        puzzle = base64.b64decode(data["cryptopuzzle"])
                                         print("To solve this puzzle, your checksum must beggin with: " + base64.b64encode(puzzle).decode("utf-8"))
                                         proposals = set([])
                                         while True:
@@ -180,6 +193,7 @@ async def interface():
                                         message["auction"]={"serialNum":input("*Serial Number: ")}
 
                                     # Send encrypted message
+                                    message["user"]=user
                                     message["key"]=client_public_key.public_bytes(serialization.Encoding.PEM, serialization.PublicFormat.SubjectPublicKeyInfo).decode("utf-8")
                                     out = encryptMsg(json.dumps(message), manager_public_key)
                                     await websocket1.send(out)
@@ -189,6 +203,6 @@ async def interface():
                                     symmetric_key, symmetric_iv, data = decryptMsg(response, client_private_key)
                                     print(data)
 
-                                act = input("0-Leave\n1-Create Auction\n2-Close Auction\n3-List Auctions\n4-List Bids of Auction\n5-List Bids by Client\n6-Check Outcome\n7-Make Bid\nAction: ")
+                                act = input("0-Leave\n1-Create Auction\n2-Close Auction\n3-List Auctions\n4-List Bids of Auction\n5-List My Bids\n6-Check Outcome\n7-Make Bid\nAction: ")
 
 asyncio.get_event_loop().run_until_complete(interface())
