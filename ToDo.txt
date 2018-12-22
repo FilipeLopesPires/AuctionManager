@@ -1,0 +1,6 @@
+Blockchain - all auction types
+Blockchain integrity control - sending blockchain, iv and key to client
+Bid Receipts - sending current blockchain state
+Crypto Puzzle
+Validation/Modification Functions - application (actually calling them, threads??)
+
