@@ -91,7 +91,10 @@ class Repository:
                     self.users[user] = client_public_key.public_numbers()
 
                 if "cryptoanswer" in bid.keys() and self.validateCryptoPuzzle(client_public_key, bid, bid["cryptoanswer"]):
-                    return await self.auctions[bid["auction"]].makeBid(data["bid"])
+                    if "amount_limit" in data:
+                        
+                    else:
+                        return await self.auctions[bid["auction"]].makeBid(data["bid"])
                 return '{"status":1}'
             
             if data["auction"] in self.auctions:

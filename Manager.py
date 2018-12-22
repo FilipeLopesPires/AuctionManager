@@ -2,6 +2,7 @@ import os
 import json
 import websockets
 import asyncio
+import threading
 from datetime import datetime, timedelta
 
 from cryptography.hazmat.backends import default_backend
@@ -13,6 +14,7 @@ class Manager:
     
     def __init__(self):
         self.auctions={} # auctionkey: {limituser:...,userbids:...,validation:..., modification:...,users:{user1:nBids, ....}}
+        self.manipulation_threads={}
 
     async def process(self, jsonData, repo):
         with open("repository_public_key.pem", "rb") as repository_public_key_file:
@@ -36,21 +38,34 @@ class Manager:
                         if data["auction"]["serialNum"] in self.auctions:
                             del self.auctions[data["auction"]["serialNum"]]
                         
-                    if action=="10":   #bid validation
+                    if action=="10": #bid validation
                         bid=data["bid"]
-                        #if self.auctions[bid["auction"]]["validation"] != "":
-                            # if validation fails return false!!!!!!!!! check how to do validation!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-                        if bid["user"] in self.auctions[bid["auction"]]["users"].keys():
+                        # check if bid passes the validation function (if applicable)
+                        if self.auctions[bid["auction"]]["validation"] != "":
+                            if not exec(self.auctions[bid["auction"]]["validation"], {"bid":bid}):
+                                return '{"status":1}'
+                        # make bid
+                        if bid["user"] in self.auctions[bid["auction"]]["users"].keys(): # if user has already done a previous bid
+                            # if auction accepts more bids from the same user
                             if (self.auctions[bid["auction"]]["users"][bid["user"]] < self.auctions[bid["auction"]]["userBids"]) or self.auctions[bid["auction"]]["userBids"]==-1:
                                 self.auctions[bid["auction"]]["users"][bid["user"]]+=1
-                                return '{"status":0}'
-                            return '{"status":1}'
-                        else:
-                            if (len(self.auctions[bid["auction"]]["users"].keys()) < self.auctions[bid["auction"]]["limitUsers"]) or self.auctions[bid["auction"]]["limitUsers"]==-1:
-                                self.auctions[bid["auction"]]["users"][bid["user"]]=1
-                                return '{"status":0}'
+                                # start a thread dedicated to the manipulation of that bid (if applicable)
+                                if "amount_limit" in data:
+                                    if self.auctions[bid["auction"]]["manipulation"] != "":
+                                        threading.Thread(target=self.manipulationThread, args=(bid,data["amount_limit"],self.auctions[bid["auction"]])).start()
                             else:
                                 return '{"status":1}'
+                        else: # if it's user's first bid
+                            # if auction accepts more users
+                            if (len(self.auctions[bid["auction"]]["users"].keys()) < self.auctions[bid["auction"]]["limitUsers"]) or self.auctions[bid["auction"]]["limitUsers"]==-1: 
+                                self.auctions[bid["auction"]]["users"][bid["user"]]=1
+                                # start a thread dedicated to the manipulation of that bid (if applicable)
+                                if "amount_limit" in data:
+                                    if self.auctions[bid["auction"]]["manipulation"] != "":
+                                        threading.Thread(target=self.manipulationThread, args=(bid,data["amount_limit"],self.auctions[bid["auction"]])).start()
+                            else:
+                                return '{"status":1}'
+                        return '{"status":0}'
 
                     jsonData = json.loads(jsonData)
                     jsonData["key"] = manager_public_key.public_bytes(serialization.Encoding.PEM, serialization.PublicFormat.SubjectPublicKeyInfo).decode("utf-8")
@@ -61,6 +76,22 @@ class Manager:
                     symmetric_key, symmetric_iv, out = decryptMsg(response,manager_private_key)
 
                     return out
+
+    def manipulationThread(self,client_bid,client_amount_limit,auction):
+        client_current_amount = client_bid.amount
+        # qual dos dois abaixo esta certo? a manipulation function esta guardada no serialNum? 
+        # segundo o que esta escrito em cima no if action=="1", guardamos as funcoes no serialNum .-.
+        auction_manipulation_func = auction["manipulation"]
+        auction_manipulation_func = auction.serialNum["manipulation"]
+        for i in range(0,10):
+            print(i)
+        '''
+        while # auction not finished
+            if # auction_current_amount < client_amount_limit and client_current_current_amount != auction_current_amount
+                # update my bid
+        '''
+        self.live=False
+
 
 def decryptMsg(request, private_key):
     requestList = request.split(b"PROJ_SIO_2018")
@@ -112,7 +143,7 @@ def encryptMsg(response, public_key):
 def syntaticValidation(code):
     print("now validating code...")
     # Forbidden words:
-    if "import" in code or "sys" in code or "path" in code or "dir" in code:
+    if "import" in code or "sys" in code or "path" in code or "dir" in code or "open" in code or "exec" in code:
         return False
     # Function definition in the beggining of the string (with only 1 'def'!) 
     i = code.find("def")
@@ -125,7 +156,9 @@ def syntaticValidation(code):
         if i2 != -1:
             return False
     # Function name and its only argument:
-    a = code.find("validate(bid)")
+    a = code.find("def validate(bid)")
     if a == -1:
-        return False
+        a = code.find("def modificate(bid)")
+        if a == -1:
+            return False
     return True

@@ -1,5 +1,8 @@
-User Interface - show current auction value
-Sealing Blockchain
-User Privacy
-Validation/Modification Functions - application (actually calling them, threads??)
+List My Bids - decrypt closed auctions' blockchains and return client bids
+Check Outcome - store winner user
+	      - decrypt for BlindAuction
+Modification Function - application (actually calling them, threads??)
 SmartCard Usage
+
+
+

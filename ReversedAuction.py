@@ -1,13 +1,12 @@
-from datetime import datetime
+import os
+import json
 import asyncio
 import websockets
-import threading
-import json
-from Bid import Bid
-import os
 import pickle
 import base64
-
+import threading
+from Bid import Bid
+from datetime import datetime
 
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import serialization, hashes

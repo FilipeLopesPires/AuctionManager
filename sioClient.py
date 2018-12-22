@@ -1,11 +1,8 @@
-# WS client example
-
 import os
 import json
 import base64
 import asyncio
 import websockets
-
 from datetime import datetime, timedelta
 
 from cryptography.hazmat.backends import default_backend
@@ -108,6 +105,9 @@ async def interface():
                                         else:
                                             print("This is an auction of Blind type with a minimum value of: " + str(data["minimum_value"]) + ".")
                                         message["bid"]={"auction": auction,"user": user,"amount":float(input("Amount: ")), "time":str(datetime.now())}
+                                        allow_manipulation = input("Do you want your bid value to adapt to new bids? (y/n): ")
+                                        if allow_manipulation=="y" or allow_manipulation=="Y":
+                                            message["adaptible_amount"] = input("Amount limit: ")
                                         # Solve Crypto Puzzle
                                         puzzle = base64.b64decode(data["cryptopuzzle"])
                                         print("To solve this puzzle, your checksum must beggin with: " + base64.b64encode(puzzle).decode("utf-8"))

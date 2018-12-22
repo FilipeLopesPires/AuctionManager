@@ -1,9 +1,8 @@
-# WS server example
-
+import os
+import json
 import asyncio
 import websockets
-import json
-import os
+
 from Manager import Manager
 
 from cryptography.hazmat.backends import default_backend
