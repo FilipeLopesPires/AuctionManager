@@ -70,12 +70,12 @@ async def sioRepository(websocket, path):
             
             symmetric_key, symmetric_iv, client_public_key_str, data = decryptMsg(request, repository_private_key)
 
-            response = await repo.process(data)
-
             client_public_key = serialization.load_pem_public_key(
                 str.encode(client_public_key_str),
                 backend=default_backend()
             )
+
+            response = await repo.process(data,client_public_key)
 
             out = encryptMsg(response, client_public_key)
 

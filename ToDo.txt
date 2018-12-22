@@ -4,3 +4,10 @@ Bid Receipts - sending current blockchain state
 Crypto Puzzle
 Validation/Modification Functions - application (actually calling them, threads??)
 
+
+Crypto Puzzle
+
+-qd recebo um bid, criar random num, enviar ao client
+-client calcula checksums, envia resultado qd passa nas condicoes do puzzle
+-
+

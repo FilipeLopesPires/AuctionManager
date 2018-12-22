@@ -1,5 +1,6 @@
 import os
 import json
+import base64
 import asyncio
 import websockets
 from EnglishAuction import EnglishAuction
@@ -17,8 +18,10 @@ class Repository:
     def __init__(self):
         self.auctions={}
         self.closed={}
+        self.puzzles={}
+        self.puzzle_difficulty = 1
 
-    async def process(self, jsonData):
+    async def process(self, jsonData, client_public_key):
         data=json.loads(jsonData)
         action=data["action"]
         if action=="1":#create auction          ---------receber action e auction->completa
@@ -58,8 +61,14 @@ class Repository:
             auct=data["auction"]
             return self.auctions[auct["serialNum"]].getWinningBid().getUser()
         elif action=="7":#make Bid          ---------receber action e bid
-            bid=data["bid"]
-            return await self.auctions[bid["auction"]].makeBid(data["bid"])
+            if "bid" in data.keys():
+                bid=data["bid"]
+                if "cryptoanswer" in bid.keys() and self.validateCryptoPuzzle(client_public_key, bid, bid["cryptoanswer"]):
+                    if bid["auction"] in self.auctions:
+                        return await self.auctions[bid["auction"]].makeBid(data["bid"])
+                    return '{"status":1}'
+                return '{"status":1}'
+            return json.dumps({"cryptopuzzle":self.createCryptoPuzzle(client_public_key)})
         return '{"status":0}'
 
 
@@ -85,6 +94,28 @@ class Repository:
                         print(result)
 
                         return (True if json.loads(result)["status"]==0 else False)
+
+    def createCryptoPuzzle(self, client_public_key):
+        puzzle = os.urandom(self.puzzle_difficulty)
+        self.puzzles[client_public_key.public_numbers()] = puzzle
+        return base64.b64encode(puzzle).decode("utf-8")
+
+    def validateCryptoPuzzle(self, client_public_key, client_bid, client_cryptoanswer):
+        puzzle = self.puzzles[client_public_key.public_numbers()]
+        del self.puzzles[client_public_key.public_numbers()]
+        serialized_client_bid = str.encode(json.dumps(client_bid, sort_keys=True))
+        client_cryptoanswer = base64.b64decode(client_cryptoanswer)
+        concat = serialized_client_bid + client_cryptoanswer
+        digest = hashes.Hash(hashes.SHA256(), backend=default_backend())
+        digest.update(concat)
+        checksum = digest.finalize()
+        checksum = checksum[0:len(puzzle)]
+        
+        if puzzle==checksum:
+            print("zxcyvguhbinj")
+            return True
+        return False
+
 
 def decryptMsg(request, private_key):
     requestList = request.split(b"PROJ_SIO_2018")
@@ -131,3 +162,4 @@ def encryptMsg(response, public_key):
     out= key_cyphered+ b"PROJ_SIO_2018"+ iv_cyphered+ b"PROJ_SIO_2018"+ ct
 
     return out
+

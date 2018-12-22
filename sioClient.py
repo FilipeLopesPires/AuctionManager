@@ -1,9 +1,11 @@
 # WS client example
 
+import os
+import json
+import base64
 import asyncio
 import websockets
-import json
-import os
+
 from datetime import datetime, timedelta
 
 from cryptography.hazmat.backends import default_backend
@@ -62,8 +64,8 @@ def decryptMsg(request, private_key):
 
 
 async def interface():
-    async with websockets.connect('ws://localhost:8765') as websocket1:
-        async with websockets.connect('ws://localhost:7654') as websocket2:
+    async with websockets.connect('ws://localhost:8765') as websocket1: # sioManager
+        async with websockets.connect('ws://localhost:7654') as websocket2: # sioRepository
             with open("repository_public_key.pem", "rb") as repository_public_key_file:
                 with open("manager_public_key.pem", "rb") as manager_public_key_file:
                     with open("client_public_key.pem", "rb") as client_public_key_file:
@@ -84,7 +86,39 @@ async def interface():
                                     if act=="5":
                                         message["user"]=input("User: ")
                                     if act=="7":
+                                        # Send encrypted message
+                                        message["key"]=client_public_key.public_bytes(serialization.Encoding.PEM, serialization.PublicFormat.SubjectPublicKeyInfo).decode("utf-8")
+                                        out = encryptMsg(json.dumps(message), repository_public_key)
+                                        await websocket2.send(out)
+                                        # Receive and decrypt response message
+                                        response = await websocket2.recv()
+                                        symmetric_key, symmetric_iv, data = decryptMsg(response, client_private_key)
+                                        data = json.loads(data)
+                                        # Solve Crypto Puzzle
                                         message["bid"]={"auction": input("Auction: "),"user": input("User: "),"amount":float(input("Amount: ")), "time":str(datetime.now())}
+                                        puzzle = base64.b64decode(data['cryptopuzzle'])
+                                        print("To solve this puzzle, your checksum must beggin with: " + base64.b64encode(puzzle).decode("utf-8"))
+                                        proposals = set([])
+                                        while True:
+                                            random_bytes = os.urandom(16)
+                                            message["bid"]["cryptoanswer"] = base64.b64encode(random_bytes).decode("utf-8")
+                                            serialized_message = str.encode(json.dumps(message["bid"], sort_keys=True))
+                                            concat = serialized_message + random_bytes
+                                            digest = hashes.Hash(hashes.SHA256(), backend=default_backend())
+                                            digest.update(concat)
+                                            checksum = digest.finalize()
+                                            checksum = checksum[0:len(puzzle)]
+                                            if puzzle==checksum:
+                                                proposals.add((checksum,random_bytes))
+                                                break
+                                            else:
+                                                if len(proposals)<4:
+                                                    proposals.add((checksum,random_bytes))
+                                        for p in proposals:
+                                            answer = input("Puzzle - " + base64.b64encode(puzzle).decode("utf-8") + " | Checksum - " + base64.b64encode(p[0]).decode("utf-8") + "\nDoes it solve the puzzle? (y/n): ")
+                                            if answer=="y" or answer =="Y":
+                                                message["bid"]["cryptoanswer"] = base64.b64encode(p[1]).decode("utf-8")
+                                                break
                                     
                                     # Send encrypted message
                                     message["key"]=client_public_key.public_bytes(serialization.Encoding.PEM, serialization.PublicFormat.SubjectPublicKeyInfo).decode("utf-8")
@@ -99,7 +133,7 @@ async def interface():
                                 else:
                                     message={"action":act}
                                     if act=="1": # Auction creation
-                                        print(" - Fill in the form below to create an auction (* means the field is mandatory) - ")
+                                        print("Fill in the form below to create an auction (* means the field is mandatory)")
                                         atype = input("*Auction Type (1-English Auction, 2-Reversed Auction, 3-BlindAuction): ")
                                         minimumV = float(input("*Minimum Value: "))
                                         if atype=="2":
