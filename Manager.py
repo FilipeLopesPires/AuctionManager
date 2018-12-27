@@ -36,7 +36,7 @@ class Manager:
                         if data["auction"]["serialNum"] in self.auctions:
                             del self.auctions[data["auction"]["serialNum"]]
                         
-                    if action=="10":
+                    if action=="10":   #bid validation
                         bid=data["bid"]
                         #if self.auctions[bid["auction"]]["validation"] != "":
                             # if validation fails return false!!!!!!!!! check how to do validation!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -46,7 +46,7 @@ class Manager:
                                 return '{"status":0}'
                             return '{"status":1}'
                         else:
-                            if len(self.auctions[bid["auction"]]["users"].keys()) < self.auctions[bid["auction"]]["limitUsers"]:
+                            if len(self.auctions[bid["auction"]]["users"].keys()) < self.auctions[bid["auction"]]["limitUsers"] or self.auctions[bid["auction"]]["limitUsers"]==-1:
                                 self.auctions[bid["auction"]]["users"][bid["user"]]=1
                                 return '{"status":0}'
                             else:
