@@ -83,7 +83,7 @@ class ReversedAuction:
 
                     #self.bids.append(bid)
                     self.bids.append(xorValue)
-                    return '{"user":'+bid.user+',"amount":'+ str(bid.amount) + ',"auction":' + str(bid.auction) + ',"current":' + base64.b64encode(xorValue).decode("utf-8") +'}'
+                    return '{"user":'+bid.user+',"amount":'+ str(bid.amount) + ',"auction":' + str(bid.auction) + ',"evidence":' + base64.b64encode(xorValue).decode("utf-8") +'}'
         return '{"status":1}'
 
     def getWinningBid(self):
