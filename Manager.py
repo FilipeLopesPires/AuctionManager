@@ -41,7 +41,7 @@ class Manager:
                         #if self.auctions[bid["auction"]]["validation"] != "":
                             # if validation fails return false!!!!!!!!! check how to do validation!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
                         if bid["user"] in self.auctions[bid["auction"]]["users"].keys():
-                            if self.auctions[bid["auction"]]["users"][bid["user"]] < self.auctions[bid["auction"]]["userBids"]:
+                            if (self.auctions[bid["auction"]]["users"][bid["user"]] < self.auctions[bid["auction"]]["userBids"]) or self.auctions[bid["auction"]]["userBids"]==-1:
                                 self.auctions[bid["auction"]]["users"][bid["user"]]+=1
                                 return '{"status":0}'
                             return '{"status":1}'
