@@ -69,8 +69,10 @@ class EnglishAuction:
                             xorValue+=str.encode(chr(ct[i] ^ self.iv[i%len(self.iv)]))
 
                     else:
+                        print(serializedBid)
                         digest = hashes.Hash(hashes.SHA256(), backend=default_backend())
-                        checksum = digest.update(serializedBid).finalize()
+                        digest.update(serializedBid)
+                        checksum = digest.finalize()
 
                         bid.addCheckSum(checksum)
 

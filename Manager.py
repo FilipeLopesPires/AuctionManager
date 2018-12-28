@@ -46,7 +46,7 @@ class Manager:
                                 return '{"status":0}'
                             return '{"status":1}'
                         else:
-                            if len(self.auctions[bid["auction"]]["users"].keys()) < self.auctions[bid["auction"]]["limitUsers"] or self.auctions[bid["auction"]]["limitUsers"]==-1:
+                            if (len(self.auctions[bid["auction"]]["users"].keys()) < self.auctions[bid["auction"]]["limitUsers"]) or self.auctions[bid["auction"]]["limitUsers"]==-1:
                                 self.auctions[bid["auction"]]["users"][bid["user"]]=1
                                 return '{"status":0}'
                             else:
