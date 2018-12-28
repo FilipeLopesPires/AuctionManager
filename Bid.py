@@ -8,7 +8,7 @@ class Bid:
         self.auction=data["auction"]
         self.checksumUntilNow=None
 
-    def addCheckSum(check):
+    def addCheckSum(self, check):
         self.checksumUntilNow=check
 
     def getUser(self):

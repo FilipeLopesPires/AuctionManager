@@ -51,7 +51,8 @@ class Repository:
             auct=data["auction"]
             if auct["serialNum"] not in self.closed:
                 return '{"status":1}'
-            return json.dumps({"bids":self.closed[auct["serialNum"]].getBids()})
+            auctKey, auctIv = self.closed[auct["serialNum"]].getKeyIv()
+            return json.dumps({"key": auctKey , "iv": auctIv , "chain": self.closed[auct["serialNum"]].getBids()})
         elif action=="5":#list bids by user --------receber action e user
             user=data["user"]
             liveBids=[self.auctions[x].getBids() for x in self.auctions.keys()]
@@ -112,7 +113,6 @@ class Repository:
         checksum = checksum[0:len(puzzle)]
         
         if puzzle==checksum:
-            print("zxcyvguhbinj")
             return True
         return False
 

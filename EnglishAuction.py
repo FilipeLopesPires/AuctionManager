@@ -6,6 +6,7 @@ import json
 from Bid import Bid
 import os
 import pickle
+import base64
 
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import serialization, hashes
@@ -45,16 +46,20 @@ class EnglishAuction:
         self.live=False
 
     def getBids(self):
-        print(self.bids)
-        return self.bids
-        #return [x.getRepr() for x in self.bids]
+        return [base64.b64encode(x).decode("utf-8") for x in self.bids]
+
+
+    def getKeyIv(self):
+        return base64.b64encode(self.key).decode("utf-8"), base64.b64encode(self.iv).decode("utf-8")
+
+
 
     #adicionar aos bids e atualizar a higher bid
     async def makeBid(self, bid):
         bid = Bid(bid)
         if await self.repository.validateBid(bid):
             if self.live:
-                if bid.getAmount()>self.highestBidValue and bid.getAmount()>self.minimumValue:
+                if bid.getAmount()>self.highestBidValue and (bid.getAmount()-self.highestBidValue)>=self.minimumValue:
                     self.highestBidValue=bid.getAmount()
 
                     serializedBid = pickle.dumps(bid)
