@@ -5,6 +5,11 @@ import threading
 import json
 from Bid import Bid
 
+from cryptography.hazmat.backends import default_backend
+from cryptography.hazmat.primitives import serialization, hashes
+from cryptography.hazmat.primitives.asymmetric import padding
+from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
+
 '''
     Sealed first-price auction. Each bidder bids only once and waits for the end of the auction to find out the results. 
     The bids have a minimum value allowed.
@@ -41,7 +46,40 @@ class BlindAuction:
         if await self.repository.validateBid(bid):
             if self.live:
                 if bid.getAmount()>self.minimumValue:
-                    self.bids.append(bid)
+
+                    serializedBid = pickle.dumps(bid)
+
+                    if len(self.bids)==0:
+                        cipher = Cipher(algorithms.AES(self.key), modes.OFB(self.iv), backend=default_backend())
+                        encryptor = cipher.encryptor()
+                        ct = encryptor.update(serializedBid) + encryptor.finalize()
+
+                        xorValue=b""
+                        for i in range(len(ct)):
+                            xorValue+=str.encode(chr(ct[i] ^ self.iv[i%len(self.iv)]))
+
+                    else:
+                        print(serializedBid)
+                        digest = hashes.Hash(hashes.SHA256(), backend=default_backend())
+                        digest.update(serializedBid)
+                        checksum = digest.finalize()
+
+                        bid.addCheckSum(checksum)
+
+                        thisIv=checksum[0:16]
+
+                        cipher = Cipher(algorithms.AES(self.key), modes.OFB(thisIv), backend=default_backend())
+                        encryptor = cipher.encryptor()
+                        ct = encryptor.update(serializedBid) + encryptor.finalize()
+
+                        xorValue=b""
+                        for i in range(len(ct)):
+                            xorValue+=str.encode(chr(ct[i] ^ thisIv[i%len(thisIv)]))
+
+                    #self.bids.append(bid)
+                    self.bids.append(xorValue)
+                    return '{"user":'+bid.user+',"amount":'+ str(bid.amount) + ',"auction":' + str(bid.auction) + ',"current":' + base64.b64encode(xorValue).decode("utf-8") +'}'
+        return '{"status":1}'
 
     def getWinningBid(self):
         highestBid = self.bids(0);

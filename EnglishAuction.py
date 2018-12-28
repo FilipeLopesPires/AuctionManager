@@ -60,6 +60,7 @@ class EnglishAuction:
         if await self.repository.validateBid(bid):
             if self.live:
                 if bid.getAmount()>self.highestBidValue and (bid.getAmount()-self.highestBidValue)>=self.minimumValue:
+
                     self.highestBidValue=bid.getAmount()
 
                     serializedBid = pickle.dumps(bid)
@@ -93,8 +94,7 @@ class EnglishAuction:
 
                     #self.bids.append(bid)
                     self.bids.append(xorValue)
-                    return '{"status":0}'
-
+                    return '{"user":'+bid.user+',"amount":'+ str(bid.amount) + ',"auction":' + str(bid.auction) + ',"evidence":' + base64.b64encode(xorValue).decode("utf-8") +'}'
         return '{"status":1}'
 
     def getWinningBid(self):
