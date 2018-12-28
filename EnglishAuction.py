@@ -55,7 +55,7 @@ class EnglishAuction:
 
         check_cyphered = repoPrivKey.sign(
             symmetric_iv,
-            padding.PKCS1v15()
+            padding.PKCS1v15(),
             utils.Prehashed(hashes.SHA256())
         )
 

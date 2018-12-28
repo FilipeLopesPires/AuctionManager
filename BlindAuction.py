@@ -50,7 +50,7 @@ class BlindAuction:
 
         check_cyphered = repoPrivKey.sign(
             symmetric_iv,
-            padding.PKCS1v15()
+            padding.PKCS1v15(),
             utils.Prehashed(hashes.SHA256())
         )
 
@@ -68,7 +68,7 @@ class BlindAuction:
 
         self.bids.append(xorValue)
 
-        
+
 
     def getBids(self):
         return [x.getRepr() for x in self.bids]

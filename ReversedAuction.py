@@ -54,7 +54,7 @@ class ReversedAuction:
 
         check_cyphered = repoPrivKey.sign(
             symmetric_iv,
-            padding.PKCS1v15()
+            padding.PKCS1v15(),
             utils.Prehashed(hashes.SHA256())
         )
 
@@ -72,7 +72,7 @@ class ReversedAuction:
 
         self.bids.append(xorValue)
 
-        
+
 
 
     def getBids(self):
