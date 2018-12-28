@@ -4,6 +4,9 @@ import websockets
 import threading
 import json
 from Bid import Bid
+import os
+import pickle
+import base64
 
 
 from cryptography.hazmat.backends import default_backend
@@ -41,6 +44,37 @@ class ReversedAuction:
         print("end")
         self.live=False
 
+        repoPrivKey = self.repository.getPrivKey()
+
+        digest = hashes.Hash(hashes.SHA256(), backend=default_backend())
+        digest.update(self.bids[len(self.bids)-1])
+        checksum = digest.finalize()
+
+        sealBid= Bid({"auction":self.serialNum, "user":"", "amount":str(-1), "time":datetime.strptime( str(datetime.now()), '%Y-%m-%d %H:%M:%S.%f')})
+
+        check_cyphered = repoPrivKey.sign(
+            symmetric_iv,
+            padding.PKCS1v15()
+            utils.Prehashed(hashes.SHA256())
+        )
+
+        sealBid.addCheckSum(check_cyphered)
+
+        thisIv=checksum[0:16]
+
+        cipher = Cipher(algorithms.AES(self.key), modes.OFB(thisIv), backend=default_backend())
+        encryptor = cipher.encryptor()
+        ct = encryptor.update(serializedBid) + encryptor.finalize()
+
+        xorValue=b""
+        for i in range(len(ct)):
+            xorValue+=str.encode(chr(ct[i] ^ thisIv[i%len(thisIv)]))
+
+        self.bids.append(xorValue)
+
+        
+
+
     def getBids(self):
         return [x.getRepr() for x in self.bids]
 
@@ -52,9 +86,10 @@ class ReversedAuction:
                 if bid.getAmount()<self.lowestBidValue and self.lowestBidValue-bid.getAmount()<self.marginValue and bid.getAmount()>self.minimumValue:
                     self.lowestBidValue=bid.getAmount()
                     
-                    serializedBid = pickle.dumps(bid)
-
                     if len(self.bids)==0:
+                        bid.addCheckSum(self.iv)
+                        serializedBid = pickle.dumps(bid)
+
                         cipher = Cipher(algorithms.AES(self.key), modes.OFB(self.iv), backend=default_backend())
                         encryptor = cipher.encryptor()
                         ct = encryptor.update(serializedBid) + encryptor.finalize()
@@ -64,12 +99,14 @@ class ReversedAuction:
                             xorValue+=str.encode(chr(ct[i] ^ self.iv[i%len(self.iv)]))
 
                     else:
-                        print(serializedBid)
+
                         digest = hashes.Hash(hashes.SHA256(), backend=default_backend())
-                        digest.update(serializedBid)
+                        digest.update(self.bids[len(self.bids)-1])
                         checksum = digest.finalize()
 
                         bid.addCheckSum(checksum)
+
+                        serializedBid = pickle.dumps(bid)
 
                         thisIv=checksum[0:16]
 
