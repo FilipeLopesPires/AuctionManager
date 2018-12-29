@@ -85,7 +85,7 @@ async def interface():
                                 if act!="1" and act!="2":
                                     message={"action":act}
                                     if act=="4" or act=="6":
-                                        message["auction"]={"serialNum":input("Serial Number: ")}
+                                        message["auction"]={"serialNum":input("*Serial Number: ")}
                                     if act=="5":
                                         message["user"]=user
                                     if act=="7":

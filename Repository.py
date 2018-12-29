@@ -73,7 +73,11 @@ class Repository:
         
         elif action=="6":#get Auction outcome          ---------receber action e auction->serialNum
             auct=data["auction"]
-            return self.auctions[auct["serialNum"]].getWinningBid().getUser()
+
+            if auct["serialNum"] not in self.closed:
+                return '{"status":1}'
+
+            return self.closed[auct["serialNum"]].getOutcome()
         
         elif action=="7":#make Bid          ---------receber action e bid
             if "bid" in data.keys():

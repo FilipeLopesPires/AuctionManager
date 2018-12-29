@@ -27,6 +27,7 @@ class EnglishAuction:
         self.live=True
         self.repository=repository
         self.highestBidValue=minimumValue
+        self.highestBidUser=""
         self.minimumValue=minimumValue
 
         self.key=os.urandom(32)
@@ -47,19 +48,27 @@ class EnglishAuction:
 
         repoPrivKey = self.repository.getPrivKey()
 
-        digest = hashes.Hash(hashes.SHA256(), backend=default_backend())
-        digest.update(self.bids[len(self.bids)-1])
-        checksum = digest.finalize()
+        if len(self.bids)>0:
+            lastBlock = bytes(self.bids[len(self.bids)-1])
+
+            digest = hashes.Hash(hashes.SHA256(), backend=default_backend())
+            digest.update(lastBlock)
+            checksum = digest.finalize()
+
+        else:
+            checksum=self.iv
+
 
         sealBid= Bid({"auction":self.serialNum, "user":"", "amount":str(-1), "time":datetime.strptime( str(datetime.now()), '%Y-%m-%d %H:%M:%S.%f')})
 
         check_cyphered = repoPrivKey.sign(
-            symmetric_iv,
+            checksum,
             padding.PKCS1v15(),
             utils.Prehashed(hashes.SHA256())
         )
 
         sealBid.addCheckSum(check_cyphered)
+        serializedBid = pickle.dumps(sealBid)
 
         thisIv=checksum[0:16]
 
@@ -67,16 +76,17 @@ class EnglishAuction:
         encryptor = cipher.encryptor()
         ct = encryptor.update(serializedBid) + encryptor.finalize()
 
-        xorValue=b""
+        xorValue=[]
         for i in range(len(ct)):
-            xorValue+=str.encode(chr(ct[i] ^ thisIv[i%len(thisIv)]))
+            xorValue.append(ct[i] ^ thisIv[i%len(thisIv)])
+
 
         self.bids.append(xorValue)
 
 
 
     def getBids(self):
-        return [base64.b64encode(x).decode("utf-8") for x in self.bids]
+        return [base64.b64encode(bytes(x)).decode("utf-8") for x in self.bids]
 
 
     def getKeyIv(self):
@@ -89,9 +99,10 @@ class EnglishAuction:
         bid = Bid(bid)
         if await self.repository.validateBid(bid):
             if self.live:
-                if bid.getAmount()>self.highestBidValue:
+                if bid.amount>self.highestBidValue:
 
-                    self.highestBidValue=bid.getAmount()
+                    self.highestBidValue=bid.amount
+                    self.highestBidUser=bid.user
 
                     if len(self.bids)==0:
                         bid.addCheckSum(self.iv)
@@ -101,37 +112,36 @@ class EnglishAuction:
                         encryptor = cipher.encryptor()
                         ct = encryptor.update(serializedBid) + encryptor.finalize()
 
-                        xorValue=b""
+                        xorValue=[]
                         for i in range(len(ct)):
-                            xorValue+=str.encode(chr(ct[i] ^ self.iv[i%len(self.iv)]))
+                            xorValue.append(ct[i] ^ self.iv[i%len(self.iv)])
 
                     else:
 
                         digest = hashes.Hash(hashes.SHA256(), backend=default_backend())
-                        digest.update(self.bids[len(self.bids)-1])
+                        digest.update(bytes(self.bids[len(self.bids)-1]))
                         checksum = digest.finalize()
 
                         bid.addCheckSum(checksum)
 
                         serializedBid = pickle.dumps(bid)
+                        print(serializedBid)
 
                         thisIv=checksum[0:16]
-
                         cipher = Cipher(algorithms.AES(self.key), modes.OFB(thisIv), backend=default_backend())
                         encryptor = cipher.encryptor()
                         ct = encryptor.update(serializedBid) + encryptor.finalize()
-
-                        xorValue=b""
+                        xorValue=[]
                         for i in range(len(ct)):
-                            xorValue+=str.encode(chr(ct[i] ^ thisIv[i%len(thisIv)]))
+                            xorValue.append(ct[i] ^ thisIv[i%len(thisIv)])
 
-                    #self.bids.append(bid)
+                    #self.bids.append(bid)1
                     self.bids.append(xorValue)
-                    return '{"user":'+bid.user+',"amount":'+ str(bid.amount) + ',"auction":' + str(bid.auction) + ',"evidence":' + base64.b64encode(xorValue).decode("utf-8") +'}'
+                    return '{"user":'+bid.user+',"amount":'+ str(bid.amount) + ',"auction":' + str(bid.auction) + ',"evidence":"' + base64.b64encode(bytes(xorValue)).decode("utf-8") +'"}'
         return '{"status":1}'
 
-    def getWinningBid(self):
-            return [x for x in self.bids if x.getAmount()==self.highestBidValue][0]
+    def getOutcome(self):
+        return '{"user":'+self.highestBidUser+'}'
 
     def getRepr(self):
         return {"name":self.name, "description":self.descript, "serialNum":self.serialNum, "time":str(self.time)}

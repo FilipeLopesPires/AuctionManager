@@ -12,7 +12,7 @@ from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 class Manager:
     
     def __init__(self):
-        self.auctions={} # auctionkey: {limituser:...,userbids:...,validation:...,users:{user1:nBids, ....}}
+        self.auctions={} # auctionkey: {limituser:...,userbids:...,validation:..., modification:...,users:{user1:nBids, ....}}
 
     async def process(self, jsonData, repo):
         with open("repository_public_key.pem", "rb") as repository_public_key_file:

@@ -11,11 +11,5 @@ class Bid:
     def addCheckSum(self, check):
         self.checksumUntilNow=check
 
-    def getUser(self):
-        return '{"user":'+self.user+'}'
-
-    def getAmount(self):
-        return self.amount
-
     def getRepr(self):
         return {"auction":self.auction, "user":self.user, "amount":str(self.amount), "time":self.time}
