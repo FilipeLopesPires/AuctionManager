@@ -69,7 +69,7 @@ class Repository:
 
             liveBids=[self.auctions[x].getBids() for x in self.auctions.keys()]
             deadBids=[self.closed[x].getBids() for x in self.closed.keys()]
-            return json.dumps({"bids":[y.getRepr() for x in liveBids for y in x if y.getUser()==user] + [y.getRepr() for x in deadBids for y in x if y.getUser()==user]})
+            return json.dumps({"bids":[y.getRepr() for x in liveBids for y in x if y.user==user] + [y.getRepr() for x in deadBids for y in x if y.user==user]})
         
         elif action=="6":#get Auction outcome          ---------receber action e auction->serialNum
             auct=data["auction"]
@@ -92,7 +92,7 @@ class Repository:
 
                 if "cryptoanswer" in bid.keys() and self.validateCryptoPuzzle(client_public_key, bid, bid["cryptoanswer"]):
                     if "amount_limit" in data:
-                        
+                        pass
                     else:
                         return await self.auctions[bid["auction"]].makeBid(data["bid"])
                 return '{"status":1}'

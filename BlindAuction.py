@@ -84,8 +84,67 @@ class BlindAuction:
 
 
     def getBids(self):
-        return [base64.b64encode(bytes(x)).decode("utf-8") for x in self.bids]
+        if self.live==False:
+            clearBids=[]
 
+            startIndex=len(self.bids)-2
+            for i in range(len(self.bids)-1):
+                actualIndex=startIndex-i
+
+                digest = hashes.Hash(hashes.SHA256(), backend=default_backend())
+                digest.update(bytes(self.bids[actualIndex-1]))
+                checksum = digest.finalize()
+
+                serializedBid = bytes(self.bids[actualIndex])
+                thisIv=checksum[0:16] if actualIndex!=0 else self.iv
+
+                xorValue=[]
+                for i in range(len(serializedBid)):
+                    xorValue.append(serializedBid[i] ^ thisIv[i%len(thisIv)])
+
+                xorValue=bytes(xorValue)
+
+
+                cipher = Cipher(algorithms.AES(self.key), modes.OFB(thisIv), backend=default_backend())
+                decryptor = cipher.decryptor()
+                ct = decryptor.update(xorValue) + decryptor.finalize()
+                bid = pickle.loads(ct)
+
+                clearBids.append(bid)
+
+        else:
+            clearBids=[]
+
+            startIndex=len(self.bids)-1
+            for i in range(len(self.bids)):
+                actualIndex=startIndex-i
+
+                digest = hashes.Hash(hashes.SHA256(), backend=default_backend())
+                digest.update(bytes(self.bids[actualIndex-1]))
+                checksum = digest.finalize()
+
+                serializedBid = bytes(self.bids[actualIndex])
+                thisIv=checksum[0:16] if actualIndex!=0 else self.iv
+
+                xorValue=[]
+                for i in range(len(serializedBid)):
+                    xorValue.append(serializedBid[i] ^ thisIv[i%len(thisIv)])
+
+                xorValue=bytes(xorValue)
+
+
+                cipher = Cipher(algorithms.AES(self.key), modes.OFB(thisIv), backend=default_backend())
+                decryptor = cipher.decryptor()
+                ct = decryptor.update(xorValue) + decryptor.finalize()
+                bid = pickle.loads(ct)
+
+                clearBids.append(bid)
+
+        return clearBids
+
+
+
+        
     #adicionar aos bids e atualizar a higher bid
     async def makeBid(self, bid):
         bid = Bid(bid)
