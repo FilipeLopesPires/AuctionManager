@@ -107,7 +107,8 @@ async def interface():
                                         message["bid"]={"auction": auction,"user": user,"amount":float(input("Amount: ")), "time":str(datetime.now())}
                                         allow_manipulation = input("Do you want your bid value to adapt to new bids? (y/n): ")
                                         if allow_manipulation=="y" or allow_manipulation=="Y":
-                                            message["adaptible_amount"] = input("Amount limit: ")
+                                            message["amount_limit"] = input("Amount limit: ")
+                                            message["amount_step"] = input("Amount step: ")
                                         # Solve Crypto Puzzle
                                         puzzle = base64.b64decode(data["cryptopuzzle"])
                                         print("To solve this puzzle, your checksum must beggin with: " + base64.b64encode(puzzle).decode("utf-8"))
@@ -177,7 +178,7 @@ async def interface():
                                             #exec(validation_func, {'bid':bid_obj})
                                         message["auction"]["validation"]=validation_func
                                         
-                                        print("Manipulation functions (write a function called 'manipulate' accepting only one argument 'bid' with Python3 syntax, write 'end' to finish or skip this step):")
+                                        print("Manipulation functions (write a function called 'manipulate' accepting four arguments 'auction_amount','client_amount','client_amount_limit','client_amount_step' with Python3 syntax, write 'end' to finish or skip this step):")
                                         manipulation_func = ""
                                         input_str = input()
                                         while input_str != "end":

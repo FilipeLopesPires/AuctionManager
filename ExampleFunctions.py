@@ -1,6 +1,6 @@
 '''
 	Example code for the bid validation and manipulation functions.
-	Note: the unsafe examples only test the validate(bid) function, but the same syntatic validation occurs in the manipulate(bid) function.
+	Note: the unsafe examples only test the validate() function, but the same syntatic validation occurs in the manipulate() function.
 '''
 
 # Safe Examples:
@@ -11,8 +11,11 @@ def validate(bid):
 		return True
 	return False
 
-def manipulate(bid):
+def manipulate(auction_amount,client_amount,client_amount_limit,client_amount_step):
 	#   .......................... To do .....................................
+	# condicionar steps
+	# alterar valor do step
+	# condicionar amount_limit
 
 # Unsafe Examples:
 

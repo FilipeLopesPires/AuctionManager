@@ -54,18 +54,18 @@ class Repository:
         elif action=="4":#list bids of auction         ---------receber action e auction->serialNum
             auct=data["auction"]
             if auct["serialNum"] not in self.closed:
-                return '{"status":1}'
+                return '{"status":1, "error":"This auction is still in progress, the information will only be available once it is finished."}'
             auctKey, auctIv = self.closed[auct["serialNum"]].getKeyIv()
             return json.dumps({"key": auctKey , "iv": auctIv , "chain": self.closed[auct["serialNum"]].getBids()})
         
         elif action=="5":#list bids by user --------receber action e user
             user=data["user"]
 
-            if user in self.users.keys():
-                if self.users[user]!=client_public_key.public_numbers():
-                    return '{"status":1}'
-            else:
-                self.users[user] = client_public_key.public_numbers()
+            if client_public_key.public_numbers() in self.users.keys():
+                if self.users[client_public_key.public_numbers()]!=user:
+                    return '{"status":1, "error":"Username already taken. Clients must choose unique usernames. Unable to list bids."}'
+                else:
+                    self.users[user] = client_public_key.public_numbers()
 
             liveBids=[self.auctions[x].getBids() for x in self.auctions.keys()]
             deadBids=[self.closed[x].getBids() for x in self.closed.keys()]
@@ -75,7 +75,7 @@ class Repository:
             auct=data["auction"]
 
             if auct["serialNum"] not in self.closed:
-                return '{"status":1}'
+                return '{"status":1, "error":"This auction is still in progress, the information will only be available once it is finished."}'
 
             return self.closed[auct["serialNum"]].getOutcome()
         
@@ -84,19 +84,18 @@ class Repository:
                 bid=data["bid"]
                 user=bid["user"]
 
-                if user in self.users.keys():
-                    if self.users[user]!=client_public_key.public_numbers():
-                        return '{"status":1}'
+                if client_public_key.public_numbers() in self.users.keys():
+                    if self.users[client_public_key.public_numbers()]!=user:
+                        return '{"status":1, "error":"Username already taken. Clients must choose unique usernames. Unable to make bid."}'
                 else:
                     self.users[user] = client_public_key.public_numbers()
 
                 if "cryptoanswer" in bid.keys() and self.validateCryptoPuzzle(client_public_key, bid, bid["cryptoanswer"]):
                     if "amount_limit" in data:
-                        pass
-                    else:
-                        return await self.auctions[bid["auction"]].makeBid(data["bid"])
-                return '{"status":1}'
-            
+                        self.subscribe(bid, data["amount_limit"], data["amount_step"])
+                    return await self.auctions[bid["auction"]].makeBid(bid)
+                return '{"status":1, "error":"Bid failed cryptopuzzle."}'
+
             if data["auction"] in self.auctions:
                 auction = self.auctions[data["auction"]]
                 puzzle_msg = {"cryptopuzzle":self.createCryptoPuzzle(client_public_key)}
@@ -109,7 +108,13 @@ class Repository:
                 elif isinstance(auction,BlindAuction):
                     puzzle_msg["minimum_value"] = auction.minimumValue
                 return json.dumps(puzzle_msg)
-            return '{"status":1}'
+
+            return '{"status":1, "error":"This auction does not exists or it is already closed."}'
+
+        elif action=="8":#make internal Bid          ---------receber action e bid
+            if "bid" in data.keys():
+                return await self.auctions[bid["auction"]].makeBid(data["bid"])
+            return '{"status":1, "error":"Internal error while updating subscription bid."}'
             
         return '{"status":0}'
 
@@ -136,6 +141,22 @@ class Repository:
                         print(result)
 
                         return (True if json.loads(result)["status"]==0 else False)
+
+    async def subscribe(self, bid, amount_limit, amount_step):
+        async with websockets.connect('ws://localhost:8765') as man:
+            with open("manager_public_key.pem", "rb") as manager_public_key_file:
+                with open("repository_public_key.pem", "rb") as repository_public_key_file:
+                    with open("repository_private_key.pem", "rb") as repository_private_key_file:
+                        manager_public_key = serialization.load_pem_public_key(manager_public_key_file.read(), backend=default_backend())
+                        repository_public_key = serialization.load_pem_public_key(repository_public_key_file.read(), backend=default_backend())
+                        repository_private_key = serialization.load_pem_private_key(repository_private_key_file.read(), password=b"SIO_85048_85122", backend=default_backend())
+
+                        out = encryptMsg(json.dumps({'action':'11', 'bid':bid.getRepr(), 'amount_limit':amount_limit, 'amount_step':amount_step, 'key':repository_public_key.public_bytes(serialization.Encoding.PEM, serialization.PublicFormat.SubjectPublicKeyInfo).decode("utf-8")}),manager_public_key)
+
+                        await man.send(out)
+                        receive = await man.recv()
+                        symmetric_key, symmetric_iv, result = decryptMsg(receive, repository_private_key)
+                        print(result)
 
     def createCryptoPuzzle(self, client_public_key):
         puzzle = os.urandom(self.puzzle_difficulty)

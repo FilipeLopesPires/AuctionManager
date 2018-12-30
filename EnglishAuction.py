@@ -173,7 +173,6 @@ class EnglishAuction:
                             xorValue.append(ct[i] ^ self.iv[i%len(self.iv)])
 
                     else:
-
                         digest = hashes.Hash(hashes.SHA256(), backend=default_backend())
                         digest.update(bytes(self.bids[len(self.bids)-1]))
                         checksum = digest.finalize()
@@ -194,7 +193,9 @@ class EnglishAuction:
                     #self.bids.append(bid)1
                     self.bids.append(xorValue)
                     return '{"user":'+bid.user+',"amount":'+ str(bid.amount) + ',"auction":' + str(bid.auction) + ',"evidence":"' + base64.b64encode(bytes(xorValue)).decode("utf-8") +'"}'
-        return '{"status":1}'
+                return '{"status":1, "error":"Unable to complete bid. Your value does not follow the auction\'s rules."}'
+            return '{"status":1, "error":"Unable to complete bid. Auction is already closed."}'
+        return '{"status":1, "error":"Bid did not pass the validation process."}'
 
     def getOutcome(self):
         return '{"user":'+self.highestBidUser+'}'
