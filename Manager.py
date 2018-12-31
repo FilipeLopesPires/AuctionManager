@@ -42,7 +42,9 @@ class Manager:
                         bid=data["bid"]
                         # check if bid passes the validation function (if applicable)
                         if self.auctions[bid["auction"]]["validation"] != "":
-                            if not exec(self.auctions[bid["auction"]]["validation"], {"bid":bid}):
+                            validationResult={}
+                            exec(self.auctions[bid["auction"]]["validation"], {"bid_user":bid["user"], "bid_amount":bid["amount"]}, validationResult)
+                            if not validationResult["result"]:
                                 return '{"status":1, "error":"Your bid failed the auction\'s validation step."}'
                         # make bid
                         if bid["user"] in self.auctions[bid["auction"]]["users"].keys(): # if user has already done a previous bid
@@ -64,9 +66,11 @@ class Manager:
                         bid=data["bid"]
                         # start a thread dedicated to the manipulation of that bid (if applicable)
                         if self.auctions[bid["auction"]]["manipulation"] != "":
-                            manipulation_threads[bid["user"]] = (data["amount_limit"],data["amount_step"])
-                            await threading.Thread(target=self.manipulationThread, args=(bid,repo)).start()
-                        return '{"status":1, "error":"No manipulation function. This auction does not support subscriptions."}'
+                            self.manipulation_threads[bid["user"]] = (data["amount_limit"],data["amount_step"])
+                            threading.Thread(target=self.launchManipulationThread, args=(bid, manager_public_key,repository_public_key, manager_private_key)).start()
+                            return '{"status":0}'
+                        else:
+                            return '{"status":1, "error":"No manipulation function. This auction does not support subscriptions."}'
 
                     jsonData = json.loads(jsonData)
                     jsonData["key"] = manager_public_key.public_bytes(serialization.Encoding.PEM, serialization.PublicFormat.SubjectPublicKeyInfo).decode("utf-8")
@@ -78,31 +82,41 @@ class Manager:
 
                     return out
 
-    async def manipulationThread(self,client_bid,repo):
-        client_name = client_bid["name"]
-        client_amount = client_bid["amount"]
-        auction = client_bid["auction"]
-        auction_manipulation_func = self.auctions[auction]["manipulation"]
-        auction_bid_count = len(self.auctions["auction"]["bids"])
-        while auction in self.auctions: # while auction not finished
-            client_amount_limit,client_amount_step = self.manipulation_threads[client_name]
-            if len(self.auctions[auction]["bids"]) > auction_bid_count:
-                auction_amount = json.loads(self.auctions[auction]["bids"][len(self.auctions[auction]["bids"])-1])["amount"]
-                auction_bid_count = len(self.auctions["auction"]["bids"])
-                result = exec(auction_manipulation_func, {'auction_amount':auction_amount,'client_amount':client_amount,'client_amount_limit':client_amount_limit,'client_amount_step':client_amount_step})
-                if result > client_amount_limit:
-                    return '{"status":1, "error":"Auction creator violated your conditions (your amount limit was surpassed)."}'
-                if auction_amount > client_amount_limit:
-                    break
+    def launchManipulationThread(self, bid,manager_public_key,repository_public_key, manager_private_key):
+        loop = asyncio.new_event_loop()
+        loop.run_until_complete(self.manipulationThread(bid,manager_public_key,repository_public_key, manager_private_key))
 
-                message={"action":8, "auction":auction, "user": client_name,"amount":result, "time":str(datetime.now())}
-                message["key"] = manager_public_key.public_bytes(serialization.Encoding.PEM, serialization.PublicFormat.SubjectPublicKeyInfo).decode("utf-8")
-                data = encryptMsg(json.dumps(message), repository_public_key)
-                await repo.send(data)
-                response = await repo.recv()
-                symmetric_key, symmetric_iv, out = decryptMsg(response,manager_private_key)
 
-        del self.manipulation_threads[client_name]
+    async def manipulationThread(self,client_bid,manager_public_key,repository_public_key, manager_private_key):
+        async with websockets.connect('ws://localhost:7654') as repo:
+            client_name = client_bid["user"]
+            client_amount = client_bid["amount"]
+            auction = client_bid["auction"]
+            auction_manipulation_func = self.auctions[auction]["manipulation"]
+            auction_bid_count = len(self.auctions[auction]["bids"])
+            while auction in self.auctions: # while auction not finished
+                client_amount_limit,client_amount_step = self.manipulation_threads[client_name]
+                if len(self.auctions[auction]["bids"]) > auction_bid_count:
+                    auction_amount = self.auctions[auction]["bids"][len(self.auctions[auction]["bids"])-1]["amount"]
+                    bid_user = self.auctions[auction]["bids"][len(self.auctions[auction]["bids"])-1]["user"]
+                    if bid_user != client_name:
+                        auction_bid_count = len(self.auctions[auction]["bids"])
+                        modificationResult = {}
+                        exec(auction_manipulation_func, {'auction_amount':auction_amount,'client_amount':client_amount,'client_amount_limit':client_amount_limit,'client_amount_step':client_amount_step}, modificationResult)
+                        if modificationResult["result"] > client_amount_limit:
+                            return '{"status":1, "error":"Auction creator violated your conditions (your amount limit was surpassed)."}'
+                        if auction_amount > client_amount_limit:
+                            break
+
+                        print(modificationResult["result"])
+                        message={"action":"8", "bid":{"auction":auction, "user": client_name,"amount":modificationResult["result"], "time":str(datetime.now())}}
+                        message["key"] = manager_public_key.public_bytes(serialization.Encoding.PEM, serialization.PublicFormat.SubjectPublicKeyInfo).decode("utf-8")
+                        data = encryptMsg(json.dumps(message), repository_public_key)
+                        await repo.send(data)
+                        response = await repo.recv()
+                        symmetric_key, symmetric_iv, out = decryptMsg(response,manager_private_key)
+
+            del self.manipulation_threads[client_name]
 
 def decryptMsg(request, private_key):
     requestList = request.split(b"PROJ_SIO_2018")
@@ -152,7 +166,6 @@ def encryptMsg(response, public_key):
     return out
 
 def syntaticValidation(code):
-    print("now validating code...")
     # Forbidden words:
     if "import" in code or "sys" in code or "open" in code or "exec" in code or "self." in code or "path" in code or "dir" in code:
         return False
@@ -167,7 +180,7 @@ def syntaticValidation(code):
         if i2 != -1:
             return False
     # Function name and its only argument:
-    a = code.find("def validate(bid)")
+    a = code.find("def validate(bid_user, bid_amount)")
     if a == -1:
         a = code.find("def manipulate(auction_amount,client_amount,client_amount_limit,client_amount_step)")
         if a == -1:

@@ -49,12 +49,13 @@ class BlindAuction:
         if len(self.bids)>0:
             lastBlock = bytes(self.bids[len(self.bids)-1])
 
-            digest = hashes.Hash(hashes.SHA256(), backend=default_backend())
-            digest.update(lastBlock)
-            checksum = digest.finalize()
-
         else:
-            checksum=self.iv
+            lastBlock=self.iv
+
+
+        digest = hashes.Hash(hashes.SHA256(), backend=default_backend())
+        digest.update(lastBlock)
+        checksum = digest.finalize()
 
 
         sealBid= Bid({"auction":self.serialNum, "user":"", "amount":str(-1), "time":datetime.strptime( str(datetime.now()), '%Y-%m-%d %H:%M:%S.%f')})
@@ -225,7 +226,7 @@ class BlindAuction:
                 maxAmount=b.amount
                 maxUser=b.user
 
-        return '{"user":'+maxUser+'}'
+        return '{"user":"'+maxUser+'"}'
 
 
 

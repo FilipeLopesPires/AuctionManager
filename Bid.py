@@ -12,4 +12,4 @@ class Bid:
         self.checksumUntilNow=check
 
     def getRepr(self):
-        return {"auction":self.auction, "user":self.user, "amount":str(self.amount), "time":self.time}
+        return {"auction":self.auction, "user":self.user, "amount":self.amount, "time":self.time}

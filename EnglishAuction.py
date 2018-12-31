@@ -51,12 +51,13 @@ class EnglishAuction:
         if len(self.bids)>0:
             lastBlock = bytes(self.bids[len(self.bids)-1])
 
-            digest = hashes.Hash(hashes.SHA256(), backend=default_backend())
-            digest.update(lastBlock)
-            checksum = digest.finalize()
-
         else:
-            checksum=self.iv
+            lastBlock=self.iv
+
+
+        digest = hashes.Hash(hashes.SHA256(), backend=default_backend())
+        digest.update(lastBlock)
+        checksum = digest.finalize()
 
 
         sealBid= Bid({"auction":self.serialNum, "user":"", "amount":str(-1), "time":datetime.strptime( str(datetime.now()), '%Y-%m-%d %H:%M:%S.%f')})
@@ -180,7 +181,6 @@ class EnglishAuction:
                         bid.addCheckSum(checksum)
 
                         serializedBid = pickle.dumps(bid)
-                        print(serializedBid)
 
                         thisIv=checksum[0:16]
                         cipher = Cipher(algorithms.AES(self.key), modes.OFB(thisIv), backend=default_backend())
@@ -198,7 +198,7 @@ class EnglishAuction:
         return '{"status":1, "error":"Bid did not pass the validation process."}'
 
     def getOutcome(self):
-        return '{"user":'+self.highestBidUser+'}'
+        return '{"user":"'+self.highestBidUser+'"}'
 
     def getRepr(self):
         return {"name":self.name, "description":self.descript, "serialNum":self.serialNum, "time":str(self.time)}

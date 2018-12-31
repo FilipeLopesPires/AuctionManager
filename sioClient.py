@@ -2,6 +2,7 @@ import os
 import json
 import base64
 import asyncio
+import pickle
 import websockets
 from datetime import datetime, timedelta
 
@@ -73,8 +74,25 @@ async def interface():
                             client_public_key = serialization.load_pem_public_key(client_public_key_file.read(), backend=default_backend())
                             client_private_key = serialization.load_pem_private_key(client_private_key_file.read(), password=b"SIO_85048_85122", backend=default_backend())
 
+                            #enter system
                             print("\nWelcome to 'Blockchain-Based Auction Manager'!\nThis program was developed by Filipe Pires (85122) and Joao Alegria (85048) for the discipline SIO 2018/19.\n")
-                            user = input("Type in your username: ")
+                            
+                            entered=False
+                            while not entered:
+                                user=input("Type in your username: ")
+                                message = {"action":"9", "user": user}
+                                message["key"]=client_public_key.public_bytes(serialization.Encoding.PEM, serialization.PublicFormat.SubjectPublicKeyInfo).decode("utf-8")
+                                out = encryptMsg(json.dumps(message), repository_public_key)
+                                await websocket2.send(out)
+
+                                # Receive and decrypt response message
+                                response = await websocket2.recv()
+                                symmetric_key, symmetric_iv, data = decryptMsg(response, client_private_key)
+                                print(data)
+                                entered=True if json.loads(data)["status"]==0 else False
+
+
+                            message={}
 
                             # User Interface Menu
                             act = input("0-Leave\n1-Create Auction\n2-Close Auction\n3-List Auctions\n4-List Bids of Auction\n5-List My Bids\n6-Check Outcome\n7-Make Bid\nAction: ")
@@ -107,8 +125,8 @@ async def interface():
                                         message["bid"]={"auction": auction,"user": user,"amount":float(input("Amount: ")), "time":str(datetime.now())}
                                         allow_manipulation = input("Do you want your bid value to adapt to new bids? (y/n): ")
                                         if allow_manipulation=="y" or allow_manipulation=="Y":
-                                            message["amount_limit"] = input("Amount limit: ")
-                                            message["amount_step"] = input("Amount step: ")
+                                            message["amount_limit"] = float(input("Amount limit: "))
+                                            message["amount_step"] = float(input("Amount step: "))
                                         # Solve Crypto Puzzle
                                         puzzle = base64.b64decode(data["cryptopuzzle"])
                                         print("To solve this puzzle, your checksum must beggin with: " + base64.b64encode(puzzle).decode("utf-8"))
@@ -128,6 +146,9 @@ async def interface():
                                             else:
                                                 if len(proposals)<4:
                                                     proposals.add((checksum,random_bytes))
+
+                                        message["bid"]["cryptoanswer"] = base64.b64encode(b"").decode("utf-8")
+
                                         for p in proposals:
                                             answer = input("Puzzle - " + base64.b64encode(puzzle).decode("utf-8") + " | Checksum - " + base64.b64encode(p[0]).decode("utf-8") + "\nDoes it solve the puzzle? (y/n): ")
                                             if answer=="y" or answer =="Y":
@@ -143,6 +164,44 @@ async def interface():
                                     response = await websocket2.recv()
                                     symmetric_key, symmetric_iv, data = decryptMsg(response, client_private_key)
                                     print(data)
+
+
+                                    if act=="4":
+                                        dcrpt = input("Do you want to decrypt the chain?(y/n)   ->")
+                                        if dcrpt == "y" or dcrpt =="Y":
+                                            chiperbids=json.loads(data)["chain"]
+                                            chiperkey=base64.b64decode(json.loads(data)["key"])
+                                            chiperiv=base64.b64decode(json.loads(data)["iv"])
+                                            clearBids=[]
+
+                                            startIndex=len(chiperbids)-2
+                                            for i in range(len(chiperbids)-1):
+                                                actualIndex=startIndex-i
+
+                                                digest = hashes.Hash(hashes.SHA256(), backend=default_backend())
+                                                digest.update(bytes(chiperbids[actualIndex-1]))
+                                                checksum = digest.finalize()
+
+                                                serializedBid = bytes(chiperbids[actualIndex])
+                                                thisIv=checksum[0:16] if actualIndex!=0 else chiperiv
+
+                                                xorValue=[]
+                                                for i in range(len(serializedBid)):
+                                                    xorValue.append(serializedBid[i] ^ thisIv[i%len(thisIv)])
+
+                                                xorValue=bytes(xorValue)
+
+
+                                                cipher = Cipher(algorithms.AES(chiperkey), modes.OFB(thisIv), backend=default_backend())
+                                                decryptor = cipher.decryptor()
+                                                ct = decryptor.update(xorValue) + decryptor.finalize()
+                                                bid = pickle.loads(ct)
+
+                                                clearBids.append(bid.getRepr())
+
+                                            print(clearBids)
+
+
 
                                 else:
                                     message={"action":act}
@@ -173,7 +232,7 @@ async def interface():
                                             validation_func += input_str + "\n"
                                             input_str = input()
                                         if validation_func != "":
-                                            validation_func += "\nvalidate(bid)\n"
+                                            validation_func += "\nresult=validate(bid_user, bid_amount)\n"
                                             #print(validation_func)
                                             #exec(validation_func, {'bid':bid_obj})
                                         message["auction"]["validation"]=validation_func
@@ -185,7 +244,7 @@ async def interface():
                                             manipulation_func += input_str + "\n"
                                             input_str = input()
                                         if manipulation_func != "":
-                                            manipulation_func += "\nvalidate(bid)\n"
+                                            manipulation_func += "\nresult=manipulate(auction_amount,client_amount,client_amount_limit,client_amount_step)\n"
                                             #print(manipulation_func)
                                             #exec(manipulation_func, {'bid':bid_obj})
                                         message["auction"]["manipulation"]=manipulation_func
