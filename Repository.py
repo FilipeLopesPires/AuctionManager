@@ -148,6 +148,13 @@ class Repository:
                 if not verifySignature(user,base64.b64decode(data["signature"]),chain):
                     return '{"status":1, "error":"Unfortunately your signature is not valid."}'
                 self.users[client_public_key.public_numbers()] = (user, chain[0].public_key())
+
+        elif action=="0":
+            if data["user"] in [self.users[x][0] for x in self.users]:
+                k=[x for x in self.users if self.users[x][0]==data["user"]][0]
+                del self.users[k]
+                return '{"status":0, "msg":"Logged Out"}'
+            return '{"status":1, "error":"User invalid."}'
             
         return '{"status":0}'
 

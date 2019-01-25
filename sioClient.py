@@ -391,4 +391,26 @@ async def interface():
 
                         act = input("0-Leave\n1-Create Auction\n2-Close Auction\n3-List Auctions\n4-List Bids of Auction\n5-List My Bids\n6-Check Outcome\n7-Make Bid\nAction: ")
 
+
+                    #LOGOUT(remove name)
+                    message={"action":"0"}
+                    message["user"]=user
+
+                    # Send encrypted message
+                    message["key"]=client_public_key.public_bytes(serialization.Encoding.PEM, serialization.PublicFormat.SubjectPublicKeyInfo).decode("utf-8")
+                    out = encryptMsg(json.dumps(message), repository_public_key)
+                    await websocket2.send(out)
+
+                    # Receive and decrypt response message
+                    response = await websocket2.recv()
+                    symmetric_key, symmetric_iv, data = decryptMsg(response, client_private_key)
+                    print(data)
+
+                    file=open(user+"Log.txt", "a")
+                    file.write(str(datetime.now())+"  --  ")
+                    file.write(data)
+                    file.write("\n")
+                    file.close()
+
+
 asyncio.get_event_loop().run_until_complete(interface())
