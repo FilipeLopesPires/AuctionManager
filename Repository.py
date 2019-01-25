@@ -3,11 +3,13 @@ import json
 import base64
 import asyncio
 import websockets
+from datetime import datetime
 
 from EnglishAuction import EnglishAuction
 from ReversedAuction import ReversedAuction
 from BlindAuction import BlindAuction
 
+from cryptography import x509
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import serialization, hashes
 from cryptography.hazmat.primitives.asymmetric import padding
@@ -21,23 +23,38 @@ class Repository:
         self.auctions={}
         self.closed={}
         self.puzzles={}
-        self.puzzle_difficulty = 1
 
     async def process(self, jsonData, client_public_key):
+        file=open("repositoryLog.txt", "a")
+        file.write(str(datetime.now())+"  --  ")
+        file.write(jsonData)
+        file.write("\n")
+        file.close()
         data=json.loads(jsonData)
         action=data["action"]
         
         if action=="1":#create auction          ---------receber action e auction->completa
+            try:
+                pubKeyClient=None
+                for num, tup in self.users.items():
+                    if tup[0]==data["user"]:
+                        pubKeyClient=tup[1]
+                if pubKeyClient!=None:
+                    pubKeyClient.verify(base64.b64decode(data["signature"]),bytes(data["user"], "utf-8"),padding.PKCS1v15(),hashes.SHA1())
+                else:
+                    return '{"status":1, "error":"Something wrong with the user."}'
+            except:
+                return '{"status":1, "error":"Invalid Signature."}'
             if data["auction"] != None:
                 auct=data["auction"]
                 if auct["serialNum"] in self.auctions.keys() or auct["serialNum"] in self.closed.keys():
                     return '{"status":1}'
                 if auct["type"]=="1":
-                	a = EnglishAuction(auct["name"], auct["descr"], auct["time"], auct["serialNum"], self, auct["minv"])
+                	a = EnglishAuction(auct["name"], auct["descr"], auct["time"], auct["serialNum"], self, auct["minv"],auct["difficulty"], auct["validation"], auct["manipulation"])
                 if auct["type"]=="2":
-                	a = ReversedAuction(auct["name"], auct["descr"], auct["time"], auct["serialNum"], self, auct["startv"], auct["marginv"], auct["minv"])
+                	a = ReversedAuction(auct["name"], auct["descr"], auct["time"], auct["serialNum"], self, auct["startv"], auct["marginv"], auct["minv"],auct["difficulty"], auct["validation"], auct["manipulation"])
                 if auct["type"]=="3":
-                	a = BlindAuction(auct["name"], auct["descr"], auct["time"], auct["serialNum"], self, auct["minv"])
+                	a = BlindAuction(auct["name"], auct["descr"], auct["time"], auct["serialNum"], self, auct["minv"], auct["difficulty"], auct["validation"], auct["manipulation"])
                 self.auctions[auct["serialNum"]]=a
         
         elif action=="2":#end auction         ---------receber action e auction->serialNum
@@ -85,12 +102,13 @@ class Repository:
                         response = await self.subscribe(bid, data["amount_limit"], data["amount_step"])
                         if json.loads(response)["status"]==1:
                             return response
-                    return await self.auctions[bid["auction"]].makeBid(bid)
+                    if self.users[client_public_key.public_numbers()][0]==bid["user"]:
+                        return await self.auctions[bid["auction"]].makeBid(bid, self.users[client_public_key.public_numbers()][1])
                 return '{"status":1, "error":"Bid failed cryptopuzzle."}'
 
             if data["auction"] in self.auctions:
                 auction = self.auctions[data["auction"]]
-                puzzle_msg = {"cryptopuzzle":self.createCryptoPuzzle(client_public_key)}
+                puzzle_msg = {"cryptopuzzle":self.createCryptoPuzzle(auction, client_public_key)}
                 if isinstance(auction,EnglishAuction):
                     puzzle_msg["current_value"] = auction.highestBidValue
                 elif isinstance(auction,ReversedAuction):
@@ -112,10 +130,24 @@ class Repository:
         elif action=="9":  #enter system
             user=data["user"]
             if client_public_key.public_numbers() in self.users.keys():
-                if self.users[client_public_key.public_numbers()]!=user:
-                    return '{"status":1, "error":"Username already taken. Clients must choose unique usernames. Unable to make bid."}'
+                if self.users[client_public_key.public_numbers()][0]!=user:
+                    return '{"status":1, "error":"Username already taken. Clients must choose unique usernames."}'
             else:
-                self.users[client_public_key.public_numbers()] = user
+                if user in [x[0] for x in self.users.values()]:
+                    return '{"status":1, "error":"Username already taken. Clients must choose unique usernames."}'
+
+                serChain=data["chain"]
+                chain=[x509.load_pem_x509_certificate(base64.b64decode(x), default_backend()) for x in serChain]
+
+                if revokated(chain):
+                    return '{"status":1, "error":"Unfortunately your smarthcard path has a revoked certificate."}'
+                if not validatePath(chain):
+                    return '{"status":1, "error":"Unfortunately your smarthcard path is not valid."}'
+                if not correctRoot(chain):
+                    return '{"status":1, "error":"Unfortunately your smarthcard path is not signed by the right CA."}'
+                if not verifySignature(user,base64.b64decode(data["signature"]),chain):
+                    return '{"status":1, "error":"Unfortunately your signature is not valid."}'
+                self.users[client_public_key.public_numbers()] = (user, chain[0].public_key())
             
         return '{"status":0}'
 
@@ -158,8 +190,8 @@ class Repository:
                         symmetric_key, symmetric_iv, result = decryptMsg(receive, repository_private_key)
                         return result
 
-    def createCryptoPuzzle(self, client_public_key):
-        puzzle = os.urandom(self.puzzle_difficulty)
+    def createCryptoPuzzle(self,auction, client_public_key):
+        puzzle = os.urandom(auction.difficulty)
         self.puzzles[client_public_key.public_numbers()] = puzzle
         return base64.b64encode(puzzle).decode("utf-8")
 
@@ -229,3 +261,47 @@ def encryptMsg(response, public_key):
 
     return out
 
+def revokated(lst):
+    rl=[]
+    for i in range(4):
+        i+=1
+        f=open("crl/cc_ec_cidadao_crl00"+str(i)+"_crl.crl","rb")
+        data=f.read()
+        crl = x509.load_der_x509_crl(data, default_backend())
+        for x in crl:
+            rl.append(x.serial_number)
+
+    for x in lst:
+        if x.serial_number in rl:
+            return True
+    return False
+
+def validatePath(lst):
+    try:
+        for i in range(len(lst)):
+            index=i
+            index2=i+1
+            if index==len(lst)-1:
+                index2=i
+            c1=lst[index]
+            c2=lst[index2]
+            pub=c2.public_key()
+            pub.verify(c1.signature,c1.tbs_certificate_bytes,padding.PKCS1v15(),c1.signature_hash_algorithm)
+        return True
+    except:
+        return False
+
+def correctRoot(lst):
+    c = x509.load_der_x509_certificate(open("cert/ECRaizEstado.crt",'rb').read(), default_backend())
+    if lst[len(lst)-2]==c and lst[len(lst)-1].subject.get_attributes_for_oid(x509.oid.NameOID.COMMON_NAME)[0].value=="Baltimore CyberTrust Root":
+        return True
+    return False
+
+
+def verifySignature(value, sig, chain):
+    pub=chain[0].public_key()
+    try:
+        pub.verify(sig,bytes(value, "utf-8"),padding.PKCS1v15(),hashes.SHA1())
+        return True
+    except:
+        return False

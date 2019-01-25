@@ -6,6 +6,7 @@ import pickle
 import base64
 import threading
 from Bid import Bid
+from FirstBlock import FirstBlock
 from datetime import datetime
 
 from cryptography.hazmat.backends import default_backend
@@ -19,7 +20,7 @@ from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
     The auction starts with a maximum value and never hits a value lower than a given minimum.
 '''
 class ReversedAuction:
-    def __init__(self, name, descript, time, serialNum, repository, startingValue, marginValue, minimumValue):
+    def __init__(self, name, descript, time, serialNum, repository, startingValue, marginValue, minimumValue,difficulty, validation, modification):
         self.bids=[]
         self.name=name
         self.serialNum=serialNum
@@ -31,9 +32,29 @@ class ReversedAuction:
         self.lowestBidUser=""
         self.marginValue=marginValue
         self.minimumValue=minimumValue
+        self.difficulty=difficulty
 
         self.key=os.urandom(32)
         self.iv=os.urandom(16)
+
+
+        fb=FirstBlock(name, descript, time, serialNum, minimumValue, marginValue, startingValue, validation, modification)
+
+
+        fb.addCheckSum(self.iv)
+        serializedFB = pickle.dumps(fb)
+
+        cipher = Cipher(algorithms.AES(self.key), modes.OFB(self.iv), backend=default_backend())
+        encryptor = cipher.encryptor()
+        ct = encryptor.update(serializedFB) + encryptor.finalize()
+
+        xorValue=[]
+        for i in range(len(ct)):
+            xorValue.append(ct[i] ^ self.iv[i%len(self.iv)])
+
+        #self.bids.append(bid)1
+        self.bids.append(xorValue)
+
 
         threading.Thread(target=self.threadAction).start()
 
@@ -86,6 +107,13 @@ class ReversedAuction:
         self.bids.append(xorValue)
 
 
+        file=open("repositoryLog.txt", "a")
+        file.write("<<BIDCHAIN>> "+str(datetime.now())+"  --  ")
+        file.write(json.dumps(self.bids)+" KEY->"+base64.b64encode(self.key).decode("utf-8")+" IV->"+base64.b64encode(self.iv).decode("utf-8"))
+        file.write("\n")
+        file.close()
+
+
 
     def getBids(self):
         if self.live==False:
@@ -114,7 +142,8 @@ class ReversedAuction:
                 ct = decryptor.update(xorValue) + decryptor.finalize()
                 bid = pickle.loads(ct)
 
-                clearBids.append(bid)
+                if isinstance(bid, Bid):
+                    clearBids.append(bid)
 
         else:
             clearBids=[]
@@ -142,15 +171,20 @@ class ReversedAuction:
                 ct = decryptor.update(xorValue) + decryptor.finalize()
                 bid = pickle.loads(ct)
 
-                clearBids.append(bid)
+                if isinstance(bid, Bid):
+                    clearBids.append(bid)
 
         return clearBids
         
 
 
     #adicionar aos bids e atualizar a higher bid
-    async def makeBid(self, bid):
-        bid = Bid(bid)
+    async def makeBid(self, bid, client_key):
+        try:
+            client_key.verify(base64.b64decode(bid["signature"]),bytes(bid["user"], "utf-8"),padding.PKCS1v15(),hashes.SHA1())
+        except:
+            return '{"status":1, "error":"Invalid Signature."}'
+        bid = Bid(bid, client_key)
         if await self.repository.validateBid(bid):
             if self.live:
                 if bid.amount<self.lowestBidValue and self.lowestBidValue-bid.amount<self.marginValue and bid.amount>self.minimumValue:
@@ -189,7 +223,14 @@ class ReversedAuction:
 
                     #self.bids.append(bid)1
                     self.bids.append(xorValue)
-                    return '{"user":'+bid.user+',"amount":'+ str(bid.amount) + ',"auction":' + str(bid.auction) + ',"evidence":"' + base64.b64encode(bytes(xorValue)).decode("utf-8") +'"}'
+
+
+                    #repo signature
+                    privkey=self.repository.getPrivKey()
+                    signature = bytes(privkey.sign(bytes(bid.user, "utf-8"),padding.PKCS1v15(),hashes.SHA1()))
+                    sgn=base64.b64encode(signature).decode("utf-8")
+
+                    return '{"user":"'+bid.user+'","signature":"'+sgn+'","amount":'+ str(bid.amount) + ',"auction":' + str(bid.auction) + ',"evidence":"' + base64.b64encode(bytes(xorValue)).decode("utf-8") +'"}'
                 return '{"status":1, "error":"Unable to complete bid. Your value does not follow the auction\'s rules."}'
             return '{"status":1, "error":"Unable to complete bid. Auction is already closed."}'
         return '{"status":1, "error":"Bid did not pass the validation process."}'

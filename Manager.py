@@ -23,6 +23,15 @@ class Manager:
                     repository_public_key = serialization.load_pem_public_key(repository_public_key_file.read(), backend=default_backend())
                     manager_public_key = serialization.load_pem_public_key(manager_public_key_file.read(), backend=default_backend())
                     manager_private_key = serialization.load_pem_private_key(manager_private_key_file.read(), password=b"SIO_85048_85122", backend=default_backend())
+                    
+
+                    file=open("managerLog.txt", "a")
+                    file.write(str(datetime.now())+"  --  ")
+                    file.write(jsonData)
+                    file.write("\n")
+                    file.close()
+
+
                     data=json.loads(jsonData)
                     action=data["action"]
 
