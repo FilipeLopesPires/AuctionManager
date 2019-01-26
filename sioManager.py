@@ -62,7 +62,7 @@ def encryptMsg(response, public_key):
 
 
 async def sioManager(websocket, path):
-    async with websockets.connect('ws://localhost:7654') as repo:
+    async with websockets.connect('ws://172.18.0.11:7654') as repo:
         with open("manager_private_key.pem", "rb") as manager_private_key_file:
             manager_private_key = serialization.load_pem_private_key(manager_private_key_file.read(), password=b"SIO_85048_85122", backend=default_backend())
             while True:
@@ -76,8 +76,8 @@ async def sioManager(websocket, path):
                 out = encryptMsg(response, client_public_key)
                 await websocket.send(out)
 
-start_server = websockets.serve(sioManager, 'localhost', 8765)
-#start_server = websockets.serve(sioManager, '0.0.0.0', 8765)
+#start_server = websockets.serve(sioManager, 'localhost', 8765)
+start_server = websockets.serve(sioManager, '0.0.0.0', 8765)
 
 asyncio.get_event_loop().run_until_complete(start_server)
 asyncio.get_event_loop().run_forever()

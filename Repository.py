@@ -168,7 +168,7 @@ class Repository:
         del self.auctions[serialNum]
 
     async def validateBid(self, bid):
-        async with websockets.connect('ws://localhost:8765') as man:
+        async with websockets.connect('ws://172.18.0.10:8765') as man:
             with open("manager_public_key.pem", "rb") as manager_public_key_file:
                 with open("repository_public_key.pem", "rb") as repository_public_key_file:
                     with open("repository_private_key.pem", "rb") as repository_private_key_file:
@@ -185,7 +185,7 @@ class Repository:
                         return (True if json.loads(result)["status"]==0 else False)
 
     async def subscribe(self, bid, amount_limit, amount_step):
-        async with websockets.connect('ws://localhost:8765') as man:
+        async with websockets.connect('ws://172.18.0.11:8765') as man:
             with open("manager_public_key.pem", "rb") as manager_public_key_file:
                 with open("repository_public_key.pem", "rb") as repository_public_key_file:
                     with open("repository_private_key.pem", "rb") as repository_private_key_file:

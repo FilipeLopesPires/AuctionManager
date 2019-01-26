@@ -99,8 +99,9 @@ class Manager:
                         if jdata["status"]==0:
                             if data["auction"]["serialNum"] in self.auctions:
                                 del self.auctions[data["auction"]["serialNum"]]
-                                for x in self.auct_manip[data["auction"]["serialNum"]]:
-                                    x.join(0)
+                                if data["auction"]["serialNum"] in self.auct_manip.keys():
+                                    for x in self.auct_manip[data["auction"]["serialNum"]]:
+                                        x.join(0)
 
                     return out
 
@@ -110,7 +111,7 @@ class Manager:
 
 
     async def manipulationThread(self,client_bid,manager_public_key,repository_public_key, manager_private_key):
-        async with websockets.connect('ws://localhost:7654') as repo:
+        async with websockets.connect('ws://172.18.0.11:7654') as repo:
             try:
                 client_name = client_bid["user"]
                 client_amount = client_bid["amount"]
