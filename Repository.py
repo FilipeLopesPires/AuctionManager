@@ -50,20 +50,23 @@ class Repository:
                 if auct["serialNum"] in self.auctions.keys() or auct["serialNum"] in self.closed.keys():
                     return '{"status":1}'
                 if auct["type"]=="1":
-                	a = EnglishAuction(auct["name"], auct["descr"], auct["time"], auct["serialNum"], self, auct["minv"],auct["difficulty"], auct["validation"], auct["manipulation"])
+                	a = EnglishAuction(data["user"],auct["name"], auct["descr"], auct["time"], auct["serialNum"], self, auct["minv"],auct["difficulty"], auct["validation"], auct["manipulation"])
                 if auct["type"]=="2":
-                	a = ReversedAuction(auct["name"], auct["descr"], auct["time"], auct["serialNum"], self, auct["startv"], auct["marginv"], auct["minv"],auct["difficulty"], auct["validation"], auct["manipulation"])
+                	a = ReversedAuction(data["user"],auct["name"], auct["descr"], auct["time"], auct["serialNum"], self, auct["startv"], auct["marginv"], auct["minv"],auct["difficulty"], auct["validation"], auct["manipulation"])
                 if auct["type"]=="3":
-                	a = BlindAuction(auct["name"], auct["descr"], auct["time"], auct["serialNum"], self, auct["minv"], auct["difficulty"], auct["validation"], auct["manipulation"])
+                	a = BlindAuction(data["user"],auct["name"], auct["descr"], auct["time"], auct["serialNum"], self, auct["minv"], auct["difficulty"], auct["validation"], auct["manipulation"])
                 self.auctions[auct["serialNum"]]=a
         
         elif action=="2":#end auction         ---------receber action e auction->serialNum
             if data["auction"] != None:
                 auct=data["auction"]
                 if auct["serialNum"] in self.auctions.keys():
-                    self.auctions[auct["serialNum"]].endAuction()
-                    self.closed[auct["serialNum"]]=self.auctions[auct["serialNum"]]
-                    del self.auctions[auct["serialNum"]]
+                    if data["user"] == self.auctions[auct["serialNum"]].autor:
+                        self.auctions[auct["serialNum"]].endAuction()
+                        self.closed[auct["serialNum"]]=self.auctions[auct["serialNum"]]
+                        del self.auctions[auct["serialNum"]]
+                    else:
+                        return '{"status":1, "error":"This auction is not yours."}'
                 else:
                     return '{"status":1, "error":"This auction does not exist or has already finished."}'
         
@@ -73,7 +76,7 @@ class Repository:
         elif action=="4":#list bids of auction         ---------receber action e auction->serialNum
             auct=data["auction"]
             if auct["serialNum"] not in self.closed:
-                return '{"status":1, "error":"This auction does not exist or is still in progress, if that\'s the case the information will only be available once it is finished."}'
+                return '{"status":1, "error":"This auction either does not exist, or you do not have permission to see it, or it is still in progress, if that\'s the case the information will only be available once it is finished."}'
             auctKey, auctIv = self.closed[auct["serialNum"]].getKeyIv()
             return json.dumps({"key": auctKey , "iv": auctIv , "chain": self.closed[auct["serialNum"]].bids})
         
@@ -88,7 +91,7 @@ class Repository:
             auct=data["auction"]
 
             if auct["serialNum"] not in self.closed:
-                return '{"status":1, "error":"This auction does not exist or is still in progress, if that\'s the case the information will only be available once it is finished."}'
+                return '{"status":1, "error":"This auction does not exist or it is still in progress, if that\'s the case the information will only be available once it is finished."}'
 
             return self.closed[auct["serialNum"]].getOutcome()
         
@@ -124,7 +127,7 @@ class Repository:
         elif action=="8":#make internal Bid          ---------receber action e bid
             if "bid" in data.keys():
                 bid=data["bid"]
-                return await self.auctions[bid["auction"]].makeBid(data["bid"])
+                return await self.auctions[bid["auction"]].makeBid(data["bid"], None, 1)
             return '{"status":1, "error":"Internal error while updating subscription bid."}'
 
         elif action=="9":  #enter system

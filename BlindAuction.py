@@ -19,8 +19,9 @@ from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
     The bids have a minimum value allowed.
 '''
 class BlindAuction:
-    def __init__(self, name, descript, time, serialNum, repository, minimumValue,difficulty, validation, modification):
+    def __init__(self,autor, name, descript, time, serialNum, repository, minimumValue,difficulty, validation, modification):
         self.bids=[]
+        self.autor=autor
         self.name=name
         self.serialNum=serialNum
         self.descript=descript
@@ -178,11 +179,12 @@ class BlindAuction:
 
         
     #adicionar aos bids e atualizar a higher bid
-    async def makeBid(self, bid, client_key):
-        try:
-            client_key.verify(base64.b64decode(bid["signature"]),bytes(bid["user"], "utf-8"),padding.PKCS1v15(),hashes.SHA1())
-        except:
-            return '{"status":1, "error":"Invalid Signature."}'
+    async def makeBid(self, bid, client_key, c=0):
+        if c==0:
+            try:
+                client_key.verify(base64.b64decode(bid["signature"]),bytes(bid["user"], "utf-8"),padding.PKCS1v15(),hashes.SHA1())
+            except:
+                return '{"status":1, "error":"Invalid Signature."}'
         bid = Bid(bid, client_key)
         if await self.repository.validateBid(bid):
             if self.live:
@@ -268,7 +270,7 @@ class BlindAuction:
                 maxAmount=b.amount
                 maxUser=b.user
 
-        return '{"user":"'+maxUser+'"}'
+        return '{"user":"'+maxUser+'","amount":"'+str(maxAmount)+'"}'
 
 
 
@@ -277,4 +279,4 @@ class BlindAuction:
 
 
     def getRepr(self):
-        return {"name":self.name, "description":self.descript, "serialNum":self.serialNum, "time":str(self.time)}
+        return {"type": "BlindAuction", "name":self.name, "description":self.descript, "serialNum":self.serialNum, "time":str(self.time)}

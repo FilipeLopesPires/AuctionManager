@@ -14,7 +14,8 @@ class Manager:
     
     def __init__(self):
         self.auctions={} # auctionkey: {limituser:...,userbids:...,validation:..., manipulation:...,users:{user1:nBids, ....}}
-        self.manipulation_threads={} # username: amount_limit
+        self.manipulation_threads={} # username: amount_limit, step
+        self.auct_manip={} #auct:  manipthread
 
     async def process(self, jsonData, repo):
         with open("repository_public_key.pem", "rb") as repository_public_key_file:
@@ -43,9 +44,9 @@ class Manager:
                         else:
                             return '{"status":1, "error":"Unable to create auction due to unacceptable behaviour of the validation/manipulation functions."}'
 
-                    elif action=="2": #end auction
-                        if data["auction"]["serialNum"] in self.auctions:
-                            del self.auctions[data["auction"]["serialNum"]]
+                    #elif action=="2": #end auction
+                    #    if data["auction"]["serialNum"] in self.auctions:
+                    #        del self.auctions[data["auction"]["serialNum"]]
                         
                     elif action=="10": #bid validation
                         bid=data["bid"]
@@ -76,18 +77,30 @@ class Manager:
                         # start a thread dedicated to the manipulation of that bid (if applicable)
                         if self.auctions[bid["auction"]]["manipulation"] != "":
                             self.manipulation_threads[bid["user"]] = (data["amount_limit"],data["amount_step"])
-                            threading.Thread(target=self.launchManipulationThread, args=(bid, manager_public_key,repository_public_key, manager_private_key)).start()
+                            thread=threading.Thread(target=self.launchManipulationThread, args=(bid, manager_public_key,repository_public_key, manager_private_key))
+                            if bid["auction"] not in self.auct_manip.keys():
+                                self.auct_manip[bid["auction"]]=[]
+                            self.auct_manip[bid["auction"]].append(thread)
+                            thread.start()
                             return '{"status":0}'
                         else:
                             return '{"status":1, "error":"No manipulation function. This auction does not support subscriptions."}'
 
                     jsonData = json.loads(jsonData)
                     jsonData["key"] = manager_public_key.public_bytes(serialization.Encoding.PEM, serialization.PublicFormat.SubjectPublicKeyInfo).decode("utf-8")
-                    data = encryptMsg(json.dumps(jsonData), repository_public_key)
-                    await repo.send(data)
+                    outdata = encryptMsg(json.dumps(jsonData), repository_public_key)
+                    await repo.send(outdata)
 
                     response = await repo.recv()
                     symmetric_key, symmetric_iv, out = decryptMsg(response,manager_private_key)
+
+                    if action=="2":
+                        jdata=json.loads(out)
+                        if jdata["status"]==0:
+                            if data["auction"]["serialNum"] in self.auctions:
+                                del self.auctions[data["auction"]["serialNum"]]
+                                for x in self.auct_manip[data["auction"]["serialNum"]]:
+                                    x.join(0)
 
                     return out
 
@@ -98,34 +111,38 @@ class Manager:
 
     async def manipulationThread(self,client_bid,manager_public_key,repository_public_key, manager_private_key):
         async with websockets.connect('ws://localhost:7654') as repo:
-            client_name = client_bid["user"]
-            client_amount = client_bid["amount"]
-            auction = client_bid["auction"]
-            auction_manipulation_func = self.auctions[auction]["manipulation"]
-            auction_bid_count = len(self.auctions[auction]["bids"])
-            while auction in self.auctions: # while auction not finished
-                client_amount_limit,client_amount_step = self.manipulation_threads[client_name]
-                if len(self.auctions[auction]["bids"]) > auction_bid_count:
-                    auction_amount = self.auctions[auction]["bids"][len(self.auctions[auction]["bids"])-1]["amount"]
-                    bid_user = self.auctions[auction]["bids"][len(self.auctions[auction]["bids"])-1]["user"]
-                    if bid_user != client_name:
-                        auction_bid_count = len(self.auctions[auction]["bids"])
-                        modificationResult = {}
-                        exec(auction_manipulation_func, {'auction_amount':auction_amount,'client_amount':client_amount,'client_amount_limit':client_amount_limit,'client_amount_step':client_amount_step}, modificationResult)
-                        if modificationResult["result"] > client_amount_limit:
-                            return '{"status":1, "error":"Auction creator violated your conditions (your amount limit was surpassed)."}'
-                        if auction_amount > client_amount_limit:
-                            break
+            try:
+                client_name = client_bid["user"]
+                client_amount = client_bid["amount"]
+                auction = client_bid["auction"]
+                auction_manipulation_func = self.auctions[auction]["manipulation"]
+                auction_bid_count = len(self.auctions[auction]["bids"])
+                while auction in self.auctions: # while auction not finished
+                    client_amount_limit,client_amount_step = self.manipulation_threads[client_name]
+                    if len(self.auctions[auction]["bids"]) > auction_bid_count:
+                        auction_amount = self.auctions[auction]["bids"][len(self.auctions[auction]["bids"])-1]["amount"]
+                        bid_user = self.auctions[auction]["bids"][len(self.auctions[auction]["bids"])-1]["user"]
+                        if bid_user != client_name:
+                            auction_bid_count = len(self.auctions[auction]["bids"])
+                            modificationResult = {}
+                            exec(auction_manipulation_func, {'auction_amount':auction_amount,'client_amount':client_amount,'client_amount_limit':client_amount_limit,'client_amount_step':client_amount_step}, modificationResult)
+                            if modificationResult["result"] > client_amount_limit:
+                                return '{"status":1, "error":"Auction creator violated your conditions (your amount limit was surpassed)."}'
+                            if auction_amount > client_amount_limit:
+                                break
 
-                        print(modificationResult["result"])
-                        message={"action":"8", "bid":{"auction":auction, "user": client_name,"amount":modificationResult["result"], "time":str(datetime.now())}}
-                        message["key"] = manager_public_key.public_bytes(serialization.Encoding.PEM, serialization.PublicFormat.SubjectPublicKeyInfo).decode("utf-8")
-                        data = encryptMsg(json.dumps(message), repository_public_key)
-                        await repo.send(data)
-                        response = await repo.recv()
-                        symmetric_key, symmetric_iv, out = decryptMsg(response,manager_private_key)
+                            print(modificationResult["result"])
+                            message={"action":"8", "bid":{"auction":auction, "user": client_name,"amount":modificationResult["result"], "time":str(datetime.now())}}
+                            message["key"] = manager_public_key.public_bytes(serialization.Encoding.PEM, serialization.PublicFormat.SubjectPublicKeyInfo).decode("utf-8")
+                            data = encryptMsg(json.dumps(message), repository_public_key)
+                            await repo.send(data)
+                            response = await repo.recv()
+                            symmetric_key, symmetric_iv, out = decryptMsg(response,manager_private_key)
+                            print(out)
 
-            del self.manipulation_threads[client_name]
+                del self.manipulation_threads[client_name]
+            except:
+                pass
 
 def decryptMsg(request, private_key):
     requestList = request.split(b"PROJ_SIO_2018")

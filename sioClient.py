@@ -199,54 +199,58 @@ async def interface():
                                 response = await websocket2.recv()
                                 symmetric_key, symmetric_iv, data = decryptMsg(response, client_private_key)
                                 data = json.loads(data)
-                                # Fill in bid form
-                                if "current_value" in data.keys():
-                                    if "margin_value" in data.keys():
-                                        print("This is an auction of Reversed type with a margin value of: " + str(data["margin_value"]) + " and a minimum value of: " + str(data["minimum_value"]) + ".\nThe auction winning bid is currently at value: " + str(data["current_value"]))
-                                    else:
-                                        print("This is an auction of English type.\n The auction winning bid is currently at value: " + str(data["current_value"]))
-                                else:
-                                    print("This is an auction of Blind type with a minimum value of: " + str(data["minimum_value"]) + ".")
-                                message["bid"]={"auction": auction,"user": user,"amount":float(input("*Amount: ")), "time":str(datetime.now())}
-                                
-
-                                #add signature
-                                signature = bytes(session.sign(cc_private_key, bytes(message["bid"]["user"], "utf-8"), cc_mechanism))
-                                message["bid"]["signature"]=base64.b64encode(signature).decode("utf-8")
 
 
-                                allow_manipulation = input("*Do you want your bid value to adapt to new bids? (y/n): ")
-                                if allow_manipulation=="y" or allow_manipulation=="Y":
-                                    message["amount_limit"] = float(input("Amount limit: "))
-                                    message["amount_step"] = float(input("Amount step: "))
+                                if "status" not in data.keys():
 
-                                # Solve Crypto Puzzle
-                                puzzle = base64.b64decode(data["cryptopuzzle"])
-                                print("To solve this puzzle, your checksum must beggin with: " + base64.b64encode(puzzle).decode("utf-8"))
-                                proposals = set([])
-                                while True:
-                                    random_bytes = os.urandom(16)
-                                    message["bid"]["cryptoanswer"] = base64.b64encode(random_bytes).decode("utf-8")
-                                    serialized_message = str.encode(json.dumps(message["bid"], sort_keys=True))
-                                    concat = serialized_message + random_bytes
-                                    digest = hashes.Hash(hashes.SHA256(), backend=default_backend())
-                                    digest.update(concat)
-                                    checksum = digest.finalize()
-                                    checksum = checksum[0:len(puzzle)]
-                                    if puzzle==checksum:
-                                        proposals.add((checksum,random_bytes))
-                                        break
-                                    else:
-                                        if len(proposals)<4:
-                                            proposals.add((checksum,random_bytes))
+	                                # Fill in bid form
+	                                if "current_value" in data.keys():
+	                                    if "margin_value" in data.keys():
+	                                        print("This is an auction of Reversed type with a margin value of: " + str(data["margin_value"]) + " and a minimum value of: " + str(data["minimum_value"]) + ".\nThe auction winning bid is currently at value: " + str(data["current_value"]))
+	                                    else:
+	                                        print("This is an auction of English type.\n The auction winning bid is currently at value: " + str(data["current_value"]))
+	                                else:
+	                                    print("This is an auction of Blind type with a minimum value of: " + str(data["minimum_value"]) + ".")
+	                                message["bid"]={"auction": auction,"user": user,"amount":float(input("*Amount: ")), "time":str(datetime.now())}
+	                                
 
-                                message["bid"]["cryptoanswer"] = base64.b64encode(b"").decode("utf-8")
+	                                #add signature
+	                                signature = bytes(session.sign(cc_private_key, bytes(message["bid"]["user"], "utf-8"), cc_mechanism))
+	                                message["bid"]["signature"]=base64.b64encode(signature).decode("utf-8")
 
-                                for p in proposals:
-                                    answer = input("Puzzle - " + base64.b64encode(puzzle).decode("utf-8") + " | Checksum - " + base64.b64encode(p[0]).decode("utf-8") + "\nDoes it solve the puzzle? (y/n): ")
-                                    if answer=="y" or answer =="Y":
-                                        message["bid"]["cryptoanswer"] = base64.b64encode(p[1]).decode("utf-8")
-                                        break
+
+	                                allow_manipulation = input("*Do you want your bid value to adapt to new bids? (y/n): ")
+	                                if allow_manipulation=="y" or allow_manipulation=="Y":
+	                                    message["amount_limit"] = float(input("Amount limit: "))
+	                                    message["amount_step"] = float(input("Amount step: "))
+
+	                                # Solve Crypto Puzzle
+	                                puzzle = base64.b64decode(data["cryptopuzzle"])
+	                                print("To solve this puzzle, your checksum must beggin with: " + base64.b64encode(puzzle).decode("utf-8"))
+	                                proposals = set([])
+	                                while True:
+	                                    random_bytes = os.urandom(16)
+	                                    message["bid"]["cryptoanswer"] = base64.b64encode(random_bytes).decode("utf-8")
+	                                    serialized_message = str.encode(json.dumps(message["bid"], sort_keys=True))
+	                                    concat = serialized_message + random_bytes
+	                                    digest = hashes.Hash(hashes.SHA256(), backend=default_backend())
+	                                    digest.update(concat)
+	                                    checksum = digest.finalize()
+	                                    checksum = checksum[0:len(puzzle)]
+	                                    if puzzle==checksum:
+	                                        proposals.add((checksum,random_bytes))
+	                                        break
+	                                    else:
+	                                        if len(proposals)<4:
+	                                            proposals.add((checksum,random_bytes))
+
+	                                message["bid"]["cryptoanswer"] = base64.b64encode(b"").decode("utf-8")
+
+	                                for p in proposals:
+	                                    answer = input("Puzzle - " + base64.b64encode(puzzle).decode("utf-8") + " | Checksum - " + base64.b64encode(p[0]).decode("utf-8") + "\nDoes it solve the puzzle? (y/n): ")
+	                                    if answer=="y" or answer =="Y":
+	                                        message["bid"]["cryptoanswer"] = base64.b64encode(p[1]).decode("utf-8")
+	                                        break
 
                             
                             # Send encrypted message
@@ -265,49 +269,51 @@ async def interface():
                             file.write("\n")
                             file.close()
 
-                            if act=="7":
-                                jdata=json.loads(data)
-                                try:
-                                    repository_public_key.verify(base64.b64decode(jdata["signature"]),bytes(jdata["user"],"utf-8"),padding.PKCS1v15(),hashes.SHA1())
-                                    print("Signature Valid")
-                                except:
-                                    print("Signature Invalid")
+
+                            jdata=json.loads(data)
+                            if "status" not in jdata.keys():
+	                            if act=="7":
+	                                try:
+	                                    repository_public_key.verify(base64.b64decode(jdata["signature"]),bytes(jdata["user"],"utf-8"),padding.PKCS1v15(),hashes.SHA1())
+	                                    print("Signature Valid")
+	                                except:
+	                                    print("Signature Invalid")
 
 
-                            if act=="4":
-                                dcrpt = input("Do you want to decrypt the chain?(y/n)->")
-                                if dcrpt == "y" or dcrpt =="Y":
-                                    chiperbids=json.loads(data)["chain"]
-                                    chiperkey=base64.b64decode(json.loads(data)["key"])
-                                    chiperiv=base64.b64decode(json.loads(data)["iv"])
-                                    clearBids=[]
+	                            if act=="4":
+	                                dcrpt = input("Do you want to decrypt the chain?(y/n)->")
+	                                if dcrpt == "y" or dcrpt =="Y":
+	                                    chiperbids=json.loads(data)["chain"]
+	                                    chiperkey=base64.b64decode(json.loads(data)["key"])
+	                                    chiperiv=base64.b64decode(json.loads(data)["iv"])
+	                                    clearBids=[]
 
-                                    startIndex=len(chiperbids)-2
-                                    for i in range(len(chiperbids)-1):
-                                        actualIndex=startIndex-i
+	                                    startIndex=len(chiperbids)-2
+	                                    for i in range(len(chiperbids)-1):
+	                                        actualIndex=startIndex-i
 
-                                        digest = hashes.Hash(hashes.SHA256(), backend=default_backend())
-                                        digest.update(bytes(chiperbids[actualIndex-1]))
-                                        checksum = digest.finalize()
+	                                        digest = hashes.Hash(hashes.SHA256(), backend=default_backend())
+	                                        digest.update(bytes(chiperbids[actualIndex-1]))
+	                                        checksum = digest.finalize()
 
-                                        serializedBid = bytes(chiperbids[actualIndex])
-                                        thisIv=checksum[0:16] if actualIndex!=0 else chiperiv
+	                                        serializedBid = bytes(chiperbids[actualIndex])
+	                                        thisIv=checksum[0:16] if actualIndex!=0 else chiperiv
 
-                                        xorValue=[]
-                                        for i in range(len(serializedBid)):
-                                            xorValue.append(serializedBid[i] ^ thisIv[i%len(thisIv)])
+	                                        xorValue=[]
+	                                        for i in range(len(serializedBid)):
+	                                            xorValue.append(serializedBid[i] ^ thisIv[i%len(thisIv)])
 
-                                        xorValue=bytes(xorValue)
+	                                        xorValue=bytes(xorValue)
 
 
-                                        cipher = Cipher(algorithms.AES(chiperkey), modes.OFB(thisIv), backend=default_backend())
-                                        decryptor = cipher.decryptor()
-                                        ct = decryptor.update(xorValue) + decryptor.finalize()
-                                        bid = pickle.loads(ct)
+	                                        cipher = Cipher(algorithms.AES(chiperkey), modes.OFB(thisIv), backend=default_backend())
+	                                        decryptor = cipher.decryptor()
+	                                        ct = decryptor.update(xorValue) + decryptor.finalize()
+	                                        bid = pickle.loads(ct)
 
-                                        clearBids.append(bid.getRepr())
-                                    clearBids.reverse()
-                                    print(clearBids)
+	                                        clearBids.append(bid.getRepr())
+	                                    clearBids.reverse()
+	                                    print(clearBids)
 
 
 
