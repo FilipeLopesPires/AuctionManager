@@ -70,19 +70,23 @@ def decryptMsg(request, private_key):
 
 #CERTIFICATES
 
+try:
+	lib = '/usr/local/lib/libpteidpkcs11.so'
 
-lib = '/usr/local/lib/libpteidpkcs11.so'
+	pkcs11 = PyKCS11.PyKCS11Lib()
+	pkcs11.load(lib)
 
-pkcs11 = PyKCS11.PyKCS11Lib()
-pkcs11.load(lib)
+	all_attr = list(PyKCS11.CKA.keys())
+	all_attr = [e for e in all_attr if isinstance(e, int)] # filter attributes
 
-all_attr = list(PyKCS11.CKA.keys())
-all_attr = [e for e in all_attr if isinstance(e, int)] # filter attributes
+	slots = pkcs11.getSlotList()
+	slot = slots[0]
 
-slots = pkcs11.getSlotList()
-slot = slots[0]
+	session = pkcs11.openSession(slot)
 
-session = pkcs11.openSession(slot)
+except:
+	print("No Reader or no SmartCard inserted.")
+	quit()
 
 
 
