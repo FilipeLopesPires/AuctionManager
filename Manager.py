@@ -10,6 +10,10 @@ from cryptography.hazmat.primitives import serialization, hashes
 from cryptography.hazmat.primitives.asymmetric import padding
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 
+#REPOIP='ws://172.18.0.11:7654'
+REPOIP='ws://localhost:7654'
+
+
 class Manager:
     
     def __init__(self):
@@ -111,7 +115,7 @@ class Manager:
 
 
     async def manipulationThread(self,client_bid,manager_public_key,repository_public_key, manager_private_key):
-        async with websockets.connect('ws://172.18.0.11:7654') as repo:
+        async with websockets.connect(REPOIP) as repo:
             try:
                 client_name = client_bid["user"]
                 client_amount = client_bid["amount"]

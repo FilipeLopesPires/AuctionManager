@@ -15,6 +15,9 @@ from cryptography.hazmat.primitives import serialization, hashes
 from cryptography.hazmat.primitives.asymmetric import padding
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 
+#MANAGERIP='ws://172.18.0.10:8765'
+MANAGERIP='ws://localhost:8765'
+
 
 class Repository:
 
@@ -48,7 +51,7 @@ class Repository:
             if data["auction"] != None:
                 auct=data["auction"]
                 if auct["serialNum"] in self.auctions.keys() or auct["serialNum"] in self.closed.keys():
-                    return '{"status":1}'
+                    return '{"status":1, "error":"This serial number already exists."}'
                 if auct["type"]=="1":
                 	a = EnglishAuction(data["user"],auct["name"], auct["descr"], auct["time"], auct["serialNum"], self, auct["minv"],auct["difficulty"], auct["validation"], auct["manipulation"])
                 if auct["type"]=="2":
@@ -168,7 +171,7 @@ class Repository:
         del self.auctions[serialNum]
 
     async def validateBid(self, bid):
-        async with websockets.connect('ws://172.18.0.10:8765') as man:
+        async with websockets.connect(MANAGERIP) as man:
             with open("manager_public_key.pem", "rb") as manager_public_key_file:
                 with open("repository_public_key.pem", "rb") as repository_public_key_file:
                     with open("repository_private_key.pem", "rb") as repository_private_key_file:
@@ -185,7 +188,7 @@ class Repository:
                         return (True if json.loads(result)["status"]==0 else False)
 
     async def subscribe(self, bid, amount_limit, amount_step):
-        async with websockets.connect('ws://172.18.0.11:8765') as man:
+        async with websockets.connect(MANAGERIP) as man:
             with open("manager_public_key.pem", "rb") as manager_public_key_file:
                 with open("repository_public_key.pem", "rb") as repository_public_key_file:
                     with open("repository_private_key.pem", "rb") as repository_private_key_file:

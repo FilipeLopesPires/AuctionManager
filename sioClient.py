@@ -85,7 +85,7 @@ try:
 	session = pkcs11.openSession(slot)
 
 except:
-	print("No Reader or no SmartCard inserted.")
+	print("No Reader inserted.")
 	quit()
 
 
@@ -97,11 +97,16 @@ def loadVerifiedCert(cert):
         return True
     return False
 def loadCCDir():
-    for ob in session.findObjects([(PyKCS11.CKA_CLASS, 1)]):
-        attr = session.getAttributeValue(ob, all_attr)
-        attr = dict(zip(map(PyKCS11.CKA.get, all_attr), attr))
-        c = x509.load_der_x509_certificate(bytes(attr['CKA_VALUE']), default_backend())
-        r=loadVerifiedCert(c)
+    try:
+        for ob in session.findObjects([(PyKCS11.CKA_CLASS, 1)]):
+            attr = session.getAttributeValue(ob, all_attr)
+            attr = dict(zip(map(PyKCS11.CKA.get, all_attr), attr))
+            c = x509.load_der_x509_certificate(bytes(attr['CKA_VALUE']), default_backend())
+            r=loadVerifiedCert(c)
+    except:
+        print("No SmartCard inserted.")
+        quit()
+
 def loadDirPem(path):
     for d in os.scandir(path):
         if d.is_file():
@@ -128,17 +133,20 @@ loadDirPem('/etc/ssl/certs')
 loadDirDer('cert')
 
 
+try:
+    sign_cert = session.findObjects([(PyKCS11.CKA_CLASS, 1),(PyKCS11.CKA_LABEL, 'CITIZEN SIGNATURE CERTIFICATE')])[0]
+    attr = session.getAttributeValue(sign_cert, all_attr)
+    attr = dict(zip(map(PyKCS11.CKA.get, all_attr), attr))
+    cert = x509.load_der_x509_certificate(bytes(attr['CKA_VALUE']), default_backend())
 
-sign_cert = session.findObjects([(PyKCS11.CKA_CLASS, 1),(PyKCS11.CKA_LABEL, 'CITIZEN SIGNATURE CERTIFICATE')])[0]
-attr = session.getAttributeValue(sign_cert, all_attr)
-attr = dict(zip(map(PyKCS11.CKA.get, all_attr), attr))
-cert = x509.load_der_x509_certificate(bytes(attr['CKA_VALUE']), default_backend())
+    chain=buildChain(cert)
+    serChain=[base64.b64encode(x.public_bytes(serialization.Encoding.PEM)).decode("utf-8") for x in chain]
 
-chain=buildChain(cert)
-serChain=[base64.b64encode(x.public_bytes(serialization.Encoding.PEM)).decode("utf-8") for x in chain]
-
-cc_private_key = session.findObjects([(PyKCS11.CKA_CLASS, PyKCS11.CKO_PRIVATE_KEY),(PyKCS11.CKA_LABEL, 'CITIZEN SIGNATURE KEY')])[0]
-cc_mechanism = PyKCS11.Mechanism(PyKCS11.CKM_SHA1_RSA_PKCS,None)
+    cc_private_key = session.findObjects([(PyKCS11.CKA_CLASS, PyKCS11.CKO_PRIVATE_KEY),(PyKCS11.CKA_LABEL, 'CITIZEN SIGNATURE KEY')])[0]
+    cc_mechanism = PyKCS11.Mechanism(PyKCS11.CKM_SHA1_RSA_PKCS,None)
+except:
+    print("No SmartCard inserted.")
+    quit()
 
 
 #CLIENT_KEYS
@@ -348,7 +356,7 @@ async def interface():
                                 message["auction"]["difficulty"]=int(difficulty)
 
                                 
-                                print("Validation function (write a function called 'validate' accepting only one argument 'bid' with Python3 syntax, write 'end' to finish or skip this step):")
+                                print("Validation function (write a function called 'validate' accepting two arguments 'bid_user' and 'bid_amount' with Python3 syntax, write 'end' to finish or skip this step):")
                                 validation_func = ""
                                 input_str = input()
                                 while input_str != "end":

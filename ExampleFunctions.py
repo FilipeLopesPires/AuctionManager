@@ -11,6 +11,9 @@ def validate(bid_user, bid_amount):
         return True
     return False
 
+def validate(bid_user, bid_amount):
+    return True
+
 def manipulate(auction_amount,client_amount,client_amount_limit,client_amount_step):
     # I simply want to return the auction amount + client step
     return auction_amount + client_amount_step

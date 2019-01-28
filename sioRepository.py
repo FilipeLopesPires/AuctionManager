@@ -82,8 +82,8 @@ async def sioRepository(websocket, path):
 
             await websocket.send(out)
 
-#start_server = websockets.serve(sioRepository, 'localhost', 7654)
-start_server = websockets.serve(sioRepository, '0.0.0.0', 7654)
+start_server = websockets.serve(sioRepository, 'localhost', 7654)
+#start_server = websockets.serve(sioRepository, '0.0.0.0', 7654)
 
 asyncio.get_event_loop().run_until_complete(start_server)
 asyncio.get_event_loop().run_forever()
