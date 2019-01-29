@@ -60,8 +60,11 @@ class EnglishAuction:
         threading.Thread(target=self.threadAction).start()
 
     def threadAction(self):
-        while datetime.now()<self.time and self.live:
+        d=datetime.now()
+        while d<self.time and self.live:
+            d=datetime.now()
             pass
+        print(self.serialNum)
         if self.live:
             self.repository.end(self.serialNum)
         self.live=False

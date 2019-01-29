@@ -61,7 +61,7 @@ class Repository:
                 self.auctions[auct["serialNum"]]=a
         
         elif action=="2":#end auction         ---------receber action e auction->serialNum
-            if data["auction"] != None:
+            if "auction" in data:
                 auct=data["auction"]
                 if auct["serialNum"] in self.auctions.keys():
                     if data["user"] == self.auctions[auct["serialNum"]].autor:

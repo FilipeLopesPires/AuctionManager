@@ -125,10 +125,10 @@ class Manager:
                 while auction in self.auctions: # while auction not finished
                     client_amount_limit,client_amount_step = self.manipulation_threads[client_name]
                     if len(self.auctions[auction]["bids"]) > auction_bid_count:
-                        auction_amount = self.auctions[auction]["bids"][len(self.auctions[auction]["bids"])-1]["amount"]
+                        auction_bid_count = len(self.auctions[auction]["bids"])
                         bid_user = self.auctions[auction]["bids"][len(self.auctions[auction]["bids"])-1]["user"]
                         if bid_user != client_name:
-                            auction_bid_count = len(self.auctions[auction]["bids"])
+                            auction_amount = self.auctions[auction]["bids"][len(self.auctions[auction]["bids"])-1]["amount"]
                             modificationResult = {}
                             exec(auction_manipulation_func, {'auction_amount':auction_amount,'client_amount':client_amount,'client_amount_limit':client_amount_limit,'client_amount_step':client_amount_step}, modificationResult)
                             if modificationResult["result"] > client_amount_limit:
