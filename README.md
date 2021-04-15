@@ -1,6 +1,14 @@
 # Auction Manager
 A Blockchain-Based Auction Management System
 
+![](https://img.shields.io/badge/Academical%20Project-Yes-success)
+![](https://img.shields.io/badge/License-Free%20To%20Use-green)
+![](https://img.shields.io/badge/Made%20with-Python-blue)
+![](https://img.shields.io/badge/Deployment-Docker-blue)
+![](https://img.shields.io/badge/Encryption-AES-lightgrey)
+![](https://img.shields.io/badge/Encryption-RSA-lightgrey)
+![](https://img.shields.io/badge/Maintained-No-red)
+
 ## Description 
 
 The goal of this project is to provide a system that enables users to create and participate in auctions protected by tight security mechanisms with great emphasis on the blockchain technology.
